@@ -1,0 +1,14 @@
+.terraform
+*.retry
+packer/ec2_amazon-ebs.pem
+terraform/.vagrant
+.*.swp
+*.tfstate
+*.tfstate.backup
+.kitchen
+packer/*.log
+backup
+packer/logs/
+outputs
+._*
+venv

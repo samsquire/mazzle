@@ -1,0 +1,23 @@
+#!/bin/env bash
+
+set -x
+
+ENV=$1
+echo $ENV
+
+if [ -z $ENV ] ; then
+  echo "need to provide environment name"
+  exit 1
+fi
+echo "Using $ENV"
+
+
+shift
+COMPONENT=$1
+echo $COMPONENT
+if [ -z $COMPONENT ] ; then
+  echo "need to provide component name"
+  exit 1
+fi
+
+

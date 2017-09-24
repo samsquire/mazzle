@@ -1,0 +1,14 @@
+---
+name: pipelines
+backup:
+- chef/
+- terraform/
+- packer/
+- architecture.dot
+- documentation.odt
+- environments.dot
+- pipeline
+- plan
+- plan-old
+- run
+- .git

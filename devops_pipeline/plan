@@ -1,0 +1,139 @@
+#!/usr/bin/env python3
+from argparse import ArgumentParser
+from networkx.drawing.nx_pydot import read_dot
+from networkx.readwrite import json_graph
+import networkx as nx
+import sys, json
+from sys import stdout
+from pprint import pprint
+dot_graph = read_dot("architecture.dot")
+from subprocess import Popen, PIPE, run
+
+tree = nx.topological_sort(dot_graph)
+pprint(tree)
+parser = ArgumentParser(description="devops-pipeline")
+parser.add_argument("environment")
+
+args = parser.parse_args()
+print(args)
+import re 
+
+env = {}
+
+class BuildFailure(Exception):
+  pass
+
+def sorted_nicely( l ): 
+    """ Sort the given iterable in the way that humans expect.""" 
+    convert = lambda text: int(text) if text.isdigit() else text 
+    alphanum_key = lambda key: [ convert(c) for c in re.split('([0-9]+)', key) ] 
+    return sorted(l, key = alphanum_key)
+
+def write(data):
+  stdout.write(data)
+
+def build_info(environment, provider, component):
+  return "pipeline/{}/{}/{}/*".format(args.environment, provider, component)
+
+
+def get_builds(environment, provider, component):
+  query = build_info(environment, provider, component)
+  builds = run(["git", "tag", "-l", query], stdout=PIPE) 
+  tags = builds.stdout.decode('utf-8').split("\n")
+  tags.pop()
+  builds = sorted_nicely(tags)
+  if len(builds) == 0:
+    next_build = 1
+  else:
+    next_build = int(builds[-1].split("/")[-1]) + 1
+  return (builds, next_build)
+
+def run_build(build_number, count, environment, dependency, provider, component):
+  with open("logs/{:03d}-{}-{}-{}.log".format(count, args.environment, provider, component), 'w') as log_file:
+
+    env["BUILD_NUMBER"] = str(build_number)
+
+    runner = Popen(["run", environment, component], cwd=provider, stdout=PIPE, stderr=PIPE, env=env)
+    for line in iter(runner.stderr.readline, b''):
+      line_s = line.decode('utf-8')
+      sys.stdout.write(line_s)
+      log_file.write(line_s) 
+    result, err = runner.communicate() 
+    outputs = result.decode('utf-8')
+    print(outputs)
+    env.update(json.loads(outputs))
+    pprint(env)
+
+    if runner.returncode == 0:
+      print("{} Build passed".format(build_number))
+      run(["git", "tag", "pipeline/{}/{}/{}/{}".format(environment, provider, component, build_number)], stdout=PIPE) 
+      return True
+    else:
+      print("{} Build failed".format(build_number))
+      raise BuildFailure()
+
+component_folders = {
+  "chef": "applications",
+  "terraform": "components",
+  "packer": None
+}
+
+
+def visit(tree, count, needs_rebuild):
+  dependency = tree
+  provider, component = dependency.split("/")
+  write("===> {}\n".format(provider))
+  write("\t checking {}\n".format(component))
+  built = False
+  builds, next_build = get_builds(args.environment, provider, component)
+
+  if len(builds) == 0:
+    write("\t\tno previous build, needs running\n")
+    built = run_build(next_build, count, args.environment, dependency, provider, component)
+  else:
+    head = run(["git", "rev-parse", "HEAD"], stdout=PIPE).stdout.decode('utf-8').strip()
+
+    print("\t\tNext build is {}.".format(next_build))
+
+    component_folder = component_folders[provider]
+    has_component_changed = False
+    # print(head)
+    # git diff --exit-code pipeline/laptop-backup/packer/ubuntu-java/1 $(git rev-parse HEAD) .
+    if component_folder:
+      component_query = ["git", "diff", "--exit-code", builds[-1], head, "/".join([component_folder, component])]
+      component_changes = run(component_query, cwd=provider, stdout=PIPE) 
+
+      if component_changes.returncode == 0:
+        print("\tThe {} component has not changed.".format(tree))
+      else:
+        has_component_changed = True
+        print("\tThere are checked in changes to {} since last run".format(tree))
+        built = run_build(next_build, count, args.environment, dependency, provider, component)
+
+    provider_query = ["git", "diff", "--exit-code", builds[-1], head, "--", "run"]
+    provider_changes = run(provider_query, cwd=provider, stdout=PIPE) 
+
+    if provider_changes.returncode == 0:
+      print("\tThere are no checked in changes to {}".format(provider))
+    elif not has_component_changed:
+      print("\tThe {} provider has changed.".format(provider))
+      built = run_build(next_build, count, args.environment, dependency, provider, component)
+
+    if not built and needs_rebuild:
+      print("An upstream dependency causes us to rebuild.")
+      built = run_build(next_build, count, args.environment, dependency, provider, component)
+
+    local_changes_query = ["git", "diff", "--exit-code", "."]
+    local_changes = run(local_changes_query, cwd=provider, stdout=PIPE) 
+    if local_changes.returncode == 0:
+      print("There are no local changes.")
+    else:
+      print("There are local changes, ignoring. Please commit")
+  
+  return built
+
+count = 0
+needs_rebuild = False
+for child in tree:
+  if visit(child, count=count+1, needs_rebuild=needs_rebuild):
+    needs_rebuild = True 

@@ -1,0 +1,34 @@
+{% extends "layout.html" %}
+{% block body %}
+
+<img src="/environments">
+<table border="1">
+  <thead>
+    <tr>
+      <th>Environment</th>
+      <th>Status</th>
+      <th>Name</th>
+      <th>Last Success</th>
+      <th>Last Failure</th>
+      <th>Last Duration</th>
+    </tr>
+
+  </thead>
+   {% for job in jobs %} 
+    <tr>
+      <td>{{ job.environment }}</td> 
+      <td bgcolor="{{ job.status }}"></td> 
+      <td>{{ job.name }}</td> 
+      <td>{{ job.last_success }}</td> 
+      <td>{{ job.last_failure }}</td> 
+      <td>{{ job.duration }}</td> 
+    </tr>
+   {% endfor %}
+
+  <tbody>
+
+  </tbody>
+
+</table>
+<img src="/architecture">
+{% endblock %}

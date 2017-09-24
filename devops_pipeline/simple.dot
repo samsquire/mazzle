@@ -1,0 +1,9 @@
+digraph G {
+  label="simple pipeline";
+  "terraform/vpc";
+  "packer/ubuntu-java";
+  "chef/ubuntu-java";
+
+
+  "chef/ubuntu-java" -> "packer/ubuntu-java" -> "terraform/vpc";
+}

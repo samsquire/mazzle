@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+
+ENV=$1
+echo $ENV
+
+if [ -z $ENV ] ; then
+  echo "need to provide environment name"
+  exit 1
+fi
+shift
+
+
+echo "Inspecting environment $ENV"
+
+echo "===> Chef"
+pushd chef
+git diff
+popd
+
+echo "===> Packer"
+pushd packer
+git diff 
+popd
+
+echo "===> Terraform"
+
+pushd packer
+git diff 
+popd
+

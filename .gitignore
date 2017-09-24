@@ -1,0 +1,7 @@
+dist
+build
+logs
+*.pyc
+.DS_Store
+.~lock*
+

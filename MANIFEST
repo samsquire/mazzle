@@ -1,0 +1,4 @@
+include bin
+include devops_pipeline/templates/build.html
+include devops_pipeline/templates/layout.html
+
