@@ -23,7 +23,7 @@ Resources such as volumes, system packages and AMIs change infrequently and rema
 
 # Example - Prometheus and Vault cluster
 
-![AMIPipeline](/docs/example-02.png)
+![FunInfra](/docs/example-02.png)
 
 * Sets up a Prometheus instance for monitoring instances.
 * Installs node_exporter on Vault, NAT instance and bastion.
