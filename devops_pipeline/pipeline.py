@@ -394,7 +394,7 @@ def main():
       print("Running {} {}...".format(node, next_build)) 
       print("==========")
       outcome = nx.get_node_attributes(dot_graph, "rebuild")[node]
-      if outcome and (command == "apply"):
+      if outcome and (command == "apply") and node not in args.ignore:
         previous_outputs = retrieve_outputs(node)
         run_build(next_build, count + 1, args.environment, node, provider, component, previous_outputs)
       else:

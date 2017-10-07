@@ -23,6 +23,8 @@ Resources such as volumes, system packages and AMIs change infrequently and rema
 
 # Example - Prometheus and Vault cluster
 
+See [fun-infra repo](https://github.com/samsquire/fun-infra)
+
 ![FunInfra](/docs/example-02.png)
 
 * Sets up a Prometheus instance for monitoring instances.
