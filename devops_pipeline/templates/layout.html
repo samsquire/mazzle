@@ -1,9 +1,71 @@
 <!doctype html>
+<head>
 <title>Build</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/16.9.0/umd/react.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/16.8.6/umd/react-dom.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/redux/4.0.4/redux.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.26.0/babel.js"></script>
+
+</head>
 <link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}">
 <div class=page>
   <h1>Build</h1>
   <div class=metanav>
   {% block body %}{% endblock %}
-</div>
+  <script type="text/babel">
+  const INITIAL_STATE = {
+    counterValue: 0
+  }
+  const INCREASE = 'INCREASE'
+  const DECREASE = 'DECREASE'
 
+
+  let { createStore, combineReducers } = Redux
+
+  function appReducer(state = INITIAL_STATE, action = {}) {
+    switch (action.type) {
+      case INCREASE:
+        return Object.assign(state, {counterValue: state.counterValue + 1});
+
+      case DECREASE:
+        return Object.assign(state, {counterValue: state.counterValue - 1});
+
+      default:
+        return state
+    }
+  }
+
+
+  const rootReducer = combineReducers({ reducer: appReducer })
+  const store = createStore(rootReducer)
+
+
+  class App extends React.Component {
+    render() {
+      return <div>Hello world {JSON.stringify(store.getState())}</div>
+
+    }
+  }
+
+  store.subscribe(() => {
+    ReactDOM.render(<App store={store} />, document.getElementById("root"));
+
+  });
+  store.dispatch({ type: 'INIT' })
+
+
+  window.onload = function() {
+  var ws = new WebSocket("ws://localhost:8765/");
+              ws.onopen = function (event) {
+                ws.send('sam')
+              };
+              ws.onmessage = function (event) {
+                  console.log(event.data);
+              };
+              ws.onerror = function(event) {
+                console.log(event);
+              }
+  }
+
+  </script>
+</div>

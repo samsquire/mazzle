@@ -9,9 +9,10 @@ setup(
         'pydotplus',
         'networkx',
         'boto3',
-        'ansible'
+        'ansible',
+        'websockets'
     ],
     entry_points = {
-      "console_scripts": ['devops-pipeline=devops_pipeline.pipeline:main']
+      "console_scripts": ['devops-pipeline=devops_pipeline.pipeline:main', 'parallel-pipeline=devops_pipeline.parallel:main']
     }
 )

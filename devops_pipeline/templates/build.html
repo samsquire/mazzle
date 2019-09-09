@@ -1,6 +1,8 @@
 {% extends "layout.html" %}
 {% block body %}
 
+<div id="root"></div>
+
 <img src="/environments">
 <table border="1">
   <thead>
@@ -14,14 +16,14 @@
     </tr>
 
   </thead>
-   {% for job in jobs %} 
+   {% for job in jobs %}
     <tr>
-      <td>{{ job.environment }}</td> 
-      <td bgcolor="{{ job.status }}"></td> 
-      <td>{{ job.name }}</td> 
-      <td>{{ job.last_success }}</td> 
-      <td>{{ job.last_failure }}</td> 
-      <td>{{ job.duration }}</td> 
+      <td>{{ job.environment }}</td>
+      <td bgcolor="{{ job.status }}"></td>
+      <td>{{ job.name }}</td>
+      <td>{{ job.last_success }}</td>
+      <td>{{ job.last_failure }}</td>
+      <td>{{ job.duration }}</td>
     </tr>
    {% endfor %}
 
