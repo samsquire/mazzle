@@ -1,34 +1,197 @@
 <!doctype html>
+<html>
 <head>
 <title>Build</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.26.0/babel.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/16.9.0/umd/react.development.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/16.8.6/umd/react-dom.development.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/redux/4.0.4/redux.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.26.0/babel.js"></script>
 
+
+<link
+  rel="stylesheet"
+  href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+  integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+  crossorigin="anonymous"
+/>
 </head>
+<body>
 <link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}">
 <div class=page>
   <h1>Build</h1>
   <div class=metanav>
   {% block body %}{% endblock %}
+  {% raw %}
   <script type="text/babel">
+  import React from 'react';
+  import logo from './logo.svg';
+  import './App.css';
+  import Button from 'react-bootstrap/Button';
+  import Navbar from 'react-bootstrap/Navbar';
+  import Nav from 'react-bootstrap/Nav';
+  import NavDropdown from 'react-bootstrap/NavDropdown';
+  import Form from 'react-bootstrap/Form';
+  import FormControl from 'react-bootstrap/FormControl';
+  import Card from 'react-bootstrap/Card';
+  import Breadcrumb from 'react-bootstrap/Breadcrumb';
+  import Container from 'react-bootstrap/Container'
+  import Row from 'react-bootstrap/Row'
+  import Col from 'react-bootstrap/Col'
+  import ProgressBar from 'react-bootstrap/ProgressBar'
+
+
+  var data = {
+  	components: [
+  	{name: 'terraform/vault', status: 'green'},
+  	{name: 'terraform/bastion', status: 'green'},
+  	{name: 'terraform/private', status: 'green'},
+  	{name: 'terraform/prometheus', status: 'red'},
+  	{name: 'packer/ubuntu-java', status: 'green'},
+  	{name: 'packer/authenticated-ami', status: 'green'},
+  	{name: 'packer/source-ami', status: 'green'}
+  	],
+  	latest: {
+  		name: "terraform/vpc",
+  		commands: [
+  			{name: 'validate', buildIdentifier: '21', progress: 100},
+  			{name: 'test', buildIdentifier: '21', progress: 100},
+  			{name: 'package', buildIdentifier: '21', progress: 60},
+  			{name: 'plan', buildIdentifier: '21', progress: 0},
+  			{name: 'run', buildIdentifier: '21', progress: 0},
+  			{name: 'deploy', buildIdentifier: '21', progress: 0},
+  			{name: 'release', buildIdentifier: '21', progress: 0},
+  			{name: 'smoke', buildIdentifier: '21', progress: 0}
+  		]
+  	}
+  }
+
+  function chunk(arr, chunkSize) {
+  var R = [];
+  for (var i=0,len=arr.length; i<len; i+=chunkSize)
+    R.push(arr.slice(i,i+chunkSize));
+  return R;
+}
+
+class ComponentList extends React.Component {
+	constructor(props) {
+		super(props);
+	}
+
+	render() {
+		var items = this.props.components.map((item, index) => {
+			var variant = {green: 'success', 'red': 'danger'}[item.status]
+			return (
+		 <Card className="mb-4" style={{ width: '15rem' }}>
+		  <Card.Body>
+			<Card.Title><ProgressBar variant={variant} now="100" />{ item.name }</Card.Title>
+			<Card.Subtitle className="mb-2 text-muted"></Card.Subtitle>
+			<Card.Text>
+
+			</Card.Text>
+			<Card.Link href="#">View</Card.Link>
+			<Card.Link href="#">Another Link</Card.Link>
+		  </Card.Body>
+		</Card>);
+		});
+
+		var chunks = chunk(items, 3);
+		var rows = chunks.map((item, index) => {
+			return (<Row>
+			{ item.map((component, index) => {return (<Col>{component}</Col>); })}
+			</Row>);
+		});
+
+		return (<Container>
+		{rows}
+		</Container>)
+	}
+}
+
+class LatestComponentStatus extends React.Component {
+	constructor(props) {
+		super(props);
+	}
+	render() {
+		var items = this.props.latest.commands.map((item, index) => {
+			return (
+		 <Card className="mb-4" style={{ width: '10rem' }}>
+		  <Card.Body>
+			<Card.Title>{ item.name }</Card.Title>
+			<Card.Subtitle className="mb-2 text-muted"></Card.Subtitle>
+			<Card.Text>
+			{item.buildIdentifier}
+			<ProgressBar striped variant="success" now={item.progress} />
+
+			</Card.Text>
+			<Card.Link href="#">View</Card.Link>
+		  </Card.Body>
+		</Card>);
+		});
+
+		var chunks = chunk(items, 6);
+		var rows = chunks.map((item, index) => {
+			return (<Row>
+			{ item.map((component, index) => {return (<Col className="pl-0 pr-0">{component}</Col>); })}
+			</Row>);
+		});
+
+		return (<div><h2>{this.props.latest.name}</h2><Container>
+		{rows}
+		</Container></div>)
+	}
+}
+
+
   const INITIAL_STATE = {
     counterValue: 0
   }
-  const INCREASE = 'INCREASE'
-  const DECREASE = 'DECREASE'
-
+  const COMMAND_SCHEDULED = 'COMMAND_SCHEDULED';
+  const WAITING_FOR_DEPENDENCY = 'WAITING_FOR_DEPENDENCY';
+  const COMMAND_RUNNING = 'COMMAND_RUNNING';
+  const READY = 'READY';
+  const INIT = 'INIT';
 
   let { createStore, combineReducers } = Redux
 
+  var data = {
+    components: [
+      { name: 'terraform/bastion',
+          commands: [
+              {name: 'validate', status: 'READY' },
+              {name: 'test', status: 'READY' },
+              {name: 'package', status: 'READY' }
+          ]
+      }
+    ]
+  }
+
+  function scheduleCommand(component, command) {
+    return {
+      type: 'COMMAND_SCHEDULED',
+      component: component,
+      command: command
+    }
+  }
+
   function appReducer(state = INITIAL_STATE, action = {}) {
     switch (action.type) {
-      case INCREASE:
-        return Object.assign(state, {counterValue: state.counterValue + 1});
-
-      case DECREASE:
-        return Object.assign(state, {counterValue: state.counterValue - 1});
+      case INIT:
+        return Object.assign(state, action.data);
+      case COMMAND_SCHEDULED:
+        var newState = Object.assign({}, state);
+        newState.components.map((item, index) => {
+            if (item.name == action.component) {
+              item.commands.map((command, index) => {
+                if (command.name == action.command) {
+                  command.status = 'SCHEDULED'
+                }
+                return command
+              });
+              return item
+            }
+            return item
+        });
+        return newState
 
       default:
         return state
@@ -36,13 +199,139 @@
   }
 
 
-  const rootReducer = combineReducers({ reducer: appReducer })
+  const rootReducer = combineReducers({ app: appReducer })
   const store = createStore(rootReducer)
 
 
   class App extends React.Component {
     render() {
-      return <div>Hello world {JSON.stringify(store.getState())}</div>
+      return (<div className="App">
+   <nav class="navbar navbar-dark fixed-top bg-dark flex-md-nowrap p-0 shadow">
+      <a class="navbar-brand col-sm-3 col-md-2 mr-0" href="#">devops-pipeline</a>
+      <input class="form-control form-control-dark w-100" type="text" placeholder="Search" aria-label="Search" />
+      <ul class="navbar-nav px-3">
+        <li class="nav-item text-nowrap">
+          <a class="nav-link" href="#">Sign out</a>
+        </li>
+      </ul>
+    </nav>
+
+    <div class="container-fluid">
+      <div class="row">
+        <nav class="col-md-2 d-none d-md-block bg-light sidebar">
+          <div class="sidebar-sticky pt-3">
+            <ul class="nav flex-column">
+              <li class="nav-item">
+                <a class="nav-link active" href="#">
+                  <span data-feather="home"></span>
+                  Dashboard <span class="sr-only">(current)</span>
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="#">
+                  <span data-feather="file"></span>
+                  Components
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="#">
+                  <span data-feather="shopping-cart"></span>
+                  Environments
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="#">
+                  <span data-feather="users"></span>
+                  Tasks
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="#">
+                  <span data-feather="bar-chart-2"></span>
+                  Jobs
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="#">
+                  <span data-feather="layers"></span>
+                  Tooling
+                </a>
+              </li>
+            </ul>
+
+
+
+          </div>
+        </nav>
+
+        <main role="main" class="col-md-9 ml-sm-auto col-lg-10 px-4">
+          <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2">Dashboard</h1>
+
+            <div class="btn-toolbar mb-2 mb-md-0">
+              <div class="btn-group mr-2">
+                <button class="btn btn-sm btn-outline-secondary">Share</button>
+                <button class="btn btn-sm btn-outline-secondary">Export</button>
+              </div>
+              <button class="btn btn-sm btn-outline-secondary dropdown-toggle">
+                <span data-feather="calendar"></span>
+                This week
+              </button>
+            </div>
+
+          </div>
+		  <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+		<h2 class="h2">Environment</h2>
+         </div>
+
+
+		  <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+		<h2 class="h2">Components</h2>
+		<div class="btn-toolbar mb-2 mb-md-0">
+			<Form.Control type="text" placeholder="Component" />
+			</div>
+         </div>
+
+		 <ComponentList components={data.components} />
+
+	    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+			<h2 class="h2">Component View</h2>
+        </div>
+
+		<LatestComponentStatus latest={data.latest} />
+
+		<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+			<h2 class="h2">Pipeline View</h2>
+        </div>
+
+		<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+			<h2 class="h2">Task View</h2>
+        </div>
+
+		<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+			<h2 class="h2">Component Build View</h2>
+        </div>
+
+		<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+			<h2 class="h2">Task Outputs</h2>
+        </div>
+
+		<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+			<h2 class="h2">Task Log File</h2>
+        </div>
+
+
+		<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+			<h2 class="h2">Task Artifacts</h2>
+        </div>
+
+          <div class="table-responsive">
+
+          </div>
+        </main>
+      </div>
+    </div>
+</div>);
 
     }
   }
@@ -51,9 +340,12 @@
     ReactDOM.render(<App store={store} />, document.getElementById("root"));
 
   });
-  store.dispatch({ type: 'INIT' })
+  store.dispatch({ type: 'INIT', data: data })
+  setTimeout(function () {
+    store.dispatch(scheduleCommand('terraform/bastion', 'validate'));
+  }, 5000)
 
-
+  /*
   window.onload = function() {
   var ws = new WebSocket("ws://localhost:8765/");
               ws.onopen = function (event) {
@@ -65,7 +357,16 @@
               ws.onerror = function(event) {
                 console.log(event);
               }
-  }
+  } */
+
 
   </script>
+  {% endraw %}
 </div>
+</body>
+<script
+  src="https://unpkg.com/react-bootstrap@next/dist/react-bootstrap.min.js"
+  crossorigin
+/>
+
+</html>

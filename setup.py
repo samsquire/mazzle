@@ -10,7 +10,9 @@ setup(
         'networkx',
         'boto3',
         'ansible',
-        'websockets'
+        'websockets',
+        'flask-socketio',
+        'eventlet'
     ],
     entry_points = {
       "console_scripts": ['devops-pipeline=devops_pipeline.pipeline:main', 'parallel-pipeline=devops_pipeline.parallel:main']

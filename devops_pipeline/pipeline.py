@@ -19,6 +19,7 @@ from sys import stdout
 from pprint import pprint
 from subprocess import Popen, PIPE, run, call
 
+
 def parse_reference(reference):
   provider, component_name, command = reference.split("/")
   component = component_name.replace("*","")
@@ -84,11 +85,21 @@ def main():
   @app.route('/')
   def index():
       jobs = []
+
+      #for environment in ordered_environments:
+        #jobs = jobs + list(map(partial(create_jobs, environment), ordering))
+
+      return render_template('build.html', jobs=[])
+
+  @app.route('/json')
+  def return_json():
+      jobs = []
       print(ordering)
       for environment in ordered_environments:
         jobs = jobs + list(map(partial(create_jobs, environment), ordering))
 
-      return render_template('build.html', jobs=jobs)
+      return json.dumps(jobs)
+
 
   import re
 
