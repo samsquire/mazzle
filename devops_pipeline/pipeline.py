@@ -4,7 +4,10 @@ import collections
 
 from functools import partial
 from flask import Flask, render_template, Response
+from flask_socketio import SocketIO
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'secret!'
+socketio = SocketIO(app)
 
 import os
 cwd = os.getcwd()
@@ -15,6 +18,11 @@ from networkx.drawing.nx_pydot import read_dot, write_dot
 from networkx.readwrite import json_graph
 import networkx as nx
 import sys, json
+
+import sys
+dir_path = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(dir_path)
+
 from sys import stdout
 from pprint import pprint
 from subprocess import Popen, PIPE, run, call
@@ -68,9 +76,47 @@ def main():
   write_dot(dot_graph, "architecture.expanded.dot")
 
   ordering = list(tree)
-  # queued devops tool runs, each list item is a separate parallel job
-  # [[], [], []]
+  components = set()
+  for item in ordering:
+      provider, component, command, manual = parse_reference(item)
+      components.add("{}/{}".format(provider, component))
 
+
+  state = {
+    "components": [],
+    "pipeline": [],
+    "running": [],
+    "latest": {
+		"name": "terraform/vpc",
+		"commands": [
+			{"name": 'validate', "buildIdentifier": '21', "progress": 100},
+			{"name": 'test', "buildIdentifier": '21', "progress": 100},
+			{"name": 'package', "buildIdentifier": '21', "progress": 60},
+			{"name": 'plan', "buildIdentifier": '21', "progress": 0},
+			{"name": 'run', "buildIdentifier": '21', "progress": 0},
+			{"name": 'deploy', "buildIdentifier": '21', "progress": 0},
+			{"name": 'release', "buildIdentifier": '21', "progress": 0},
+			{"name": 'smoke', "buildIdentifier": '21', "progress": 0}
+		]
+    }
+  }
+  for component in components:
+       state["components"].append({
+            "name": component,
+            "status": "green",
+            "command": "plan"
+  })
+
+  def is_running(reference):
+      for item in state["running"]:
+          if item["reference"] == reference:
+            return True
+      return False
+
+  def remove_from_running(reference):
+      for item in state["running"]:
+          if item["reference"] == reference:
+            state["running"].remove(item)
 
   @app.route('/environments')
   def environments():
@@ -89,16 +135,11 @@ def main():
       #for environment in ordered_environments:
         #jobs = jobs + list(map(partial(create_jobs, environment), ordering))
 
-      return render_template('build.html', jobs=[])
+      return render_template('index.html', jobs=[])
 
   @app.route('/json')
   def return_json():
-      jobs = []
-      print(ordering)
-      for environment in ordered_environments:
-        jobs = jobs + list(map(partial(create_jobs, environment), ordering))
-
-      return json.dumps(jobs)
+      return Response(json.dumps(state), content_type="application/json")
 
 
   import re
@@ -204,10 +245,10 @@ def main():
   class BuildFailure(Exception):
     pass
 
-  def run_build(parent, build_number, count, environment, dependency, provider, component, command, previous_outputs):
+  def run_build(build_number, environment, dependency, provider, component, command, previous_outputs):
     provider, component, command, manual = parse_reference(dependency)
 
-    log_file = open("logs/{:03d}-{}-{}-{}-{}.log".format(count, args.environment, provider, component, command), 'w+')
+    log_file = open("logs/{:03d}-{}-{}-{}-{}.log".format(build_number, args.environment, provider, component, command), 'w+')
     env = {}
     env.update(previous_outputs)
     env["BUILD_NUMBER"] = str(build_number)
@@ -220,14 +261,11 @@ def main():
 
     class CommandRunner(Thread):
         def run(self):
-          if parent:
-            print("Waiting for parent")
-            parent.join()
-            print("Parent finished")
+
           if not os.path.isfile(os.path.join(provider, command)):
-            print("Skipping {}".format(command))
+            print(" not implemented {}".format(command))
             return
-          pprint(env)
+
           if args.rebuild and dependency not in args.rebuild:
               return
           runner = Popen([command,
@@ -280,6 +318,7 @@ def main():
 
 
 
+
   def retrieve_outputs(node):
     provider, component, command, manual = parse_reference(node)
     parents = list(ancestors(G, node))
@@ -325,57 +364,87 @@ def main():
       "last_failure": "",
       "last_duration": ""
     }
-  if args.gui:
-     app.run()
 
-  worker_threads = []
+
+  def begin_pipeline(run_groups, socketio=None):
+        class JobMonitor(Thread):
+            def run(self):
+                 for group in run_groups:
+                     group_handles = []
+                     for item in group:
+                         if not is_running(item):
+                             state["running"].append({"reference": item})
+
+                             if socketio:
+                                 socketio.emit('event', {
+                                    "type": 'COMMAND_RUN',
+                                    "reference": item,
+                                    "status": "green"
+                                 })
+                             else:
+                                 print("Running {}".format(item))
+                             provider, component, command, manual = parse_reference(item)
+                             builds, last_build_status, next_build = get_builds(args.environment, provider, component)
+                             print("")
+
+                             previous_outputs = retrieve_outputs(item)
+
+                             handle = run_build(next_build,
+                               args.environment,
+                               item,
+                               provider,
+                               component,
+                               command,
+                               previous_outputs)
+                             group_handles.append((item, handle))
+                         else:
+                             print("Already running")
+
+
+                     print("Waiting for group to finish...")
+                     for node, handle in group_handles:
+                         handle.join()
+                         print("Group item finished")
+                         if socketio:
+                             socketio.emit('event', {
+                                 "type": 'COMMAND_FINISH',
+                                 "reference": node,
+                                 "status": "green"
+                             })
+                         remove_from_running(node)
+
+        JobMonitor().start()
 
   if not args.show:
     finished_builds = {}
     parent = None
+    loaded_components = []
     for count, node in enumerate(ordering):
-      provider, component, command, manual = parse_reference(node)
-      if args.rebuild and node not in args.rebuild:
-          continue
-      if manual and node not in args.manual:
-          continue
+        component_ancestors = list(ancestors(G, node))
+        successors = list(G.successors(node))
+        loaded_components.append({
+            "name": node,
+            "ancestors": component_ancestors,
+            "successors": successors
+        })
+    from component_scheduler import scheduler
+    run_groups = scheduler.parallelise_components(loaded_components)
 
-      if node in finished_builds:
-          print("Skipping already scheduled build")
-          continue
-      builds, last_build_status, next_build = get_builds(args.environment, provider, component)
-      print("")
-      # print("Running {} {}...".format(node, next_build))
-      previous_outputs = retrieve_outputs(node)
-      print("Waiting for {}".format(node))
-      parent = run_build(None, next_build,
-        count + 1,
-        args.environment,
-        node,
-        provider,
-        component,
-        command,
-        previous_outputs)
-      worker_threads.append(parent)
+    if args.gui:
+        @socketio.on('join')
+        def handle_message(message):
+            pprint(message)
+            begin_pipeline(run_groups, socketio)
+            socketio.emit('message', {'data': 'foobar'})
+        socketio.run(app)
+    else:
+        begin_pipeline(run_groups)
 
-      finished_builds[node] = True
+    sys.exit(1)
 
-      for child in G.successors(node):
-          if child in finished_builds:
-              continue
-          provider, component, command, manual = parse_reference(child)
-          builds, last_build_status, next_build = get_builds(args.environment, provider, component)
-          previous_outputs = retrieve_outputs(child)
-          if manual and node not in args.manual:
-              continue
-          child_worker = run_build(parent, next_build, count + 1,
-            args.environment, child, provider, component, command,
-            previous_outputs)
-          worker_threads.append(child_worker)
-          finished_builds[child] = True
-    print("Waiting for workers to finish")
-    for thread in worker_threads:
-      thread.join()
+
+
+
 
 
 

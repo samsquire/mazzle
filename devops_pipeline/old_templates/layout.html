@@ -1,0 +1,73 @@
+<!doctype html>
+<html>
+<head>
+<title>Build</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/16.9.0/umd/react.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/16.8.6/umd/react-dom.development.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/redux/4.0.4/redux.js"></script>
+<script
+  src="https://cdnjs.cloudflare.com/ajax/libs/react-bootstrap/0.32.4/react-bootstrap.js"
+  crossorigin
+></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/6.26.0/babel.js"></script>
+
+<link
+  rel="stylesheet"
+  href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+  integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+  crossorigin="anonymous"
+/>
+</head>
+<body>
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='style.css') }}">
+<div class=page>
+  <h1>Build</h1>
+  <div class=metanav>
+  {% block body %}{% endblock %}
+  {% raw %}
+  <script type="text/babel">
+  var Card = ReactBootstrap.Card;
+  console.log(Card);
+
+  const element = <ReactBootstrap.Card>hi</ReactBootstrap.Card>
+  ReactDOM.render(element, document.getElementById('root'));
+
+
+  window.onload = function() {
+    /*
+              var ws = new WebSocket("ws://localhost:/");
+              ws.onopen = function (event) {
+                ws.send('sam')
+              };
+              ws.onmessage = function (event) {
+                  console.log(event.data);
+              };
+              ws.onerror = function(event) {
+                console.log(event);
+              } */
+
+             var socket = io();
+             socket.on('event', function(data) {
+                 console.log("Connected", data);
+             });
+
+             socket.on('connect', function() {
+                 socket.emit('message', {data: 'I\'m connected!'});
+                 console.log("Connected");
+             });
+
+  }
+
+
+  </script>
+  {% endraw %}
+</div>
+</body>
+<script
+  src="https://unpkg.com/react-bootstrap@next/dist/react-bootstrap.min.js"
+  crossorigin
+/>
+
+</html>

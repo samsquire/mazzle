@@ -12,7 +12,8 @@ setup(
         'ansible',
         'websockets',
         'flask-socketio',
-        'eventlet'
+        'eventlet',
+        'python-socketio'
     ],
     entry_points = {
       "console_scripts": ['devops-pipeline=devops_pipeline.pipeline:main', 'parallel-pipeline=devops_pipeline.parallel:main']
