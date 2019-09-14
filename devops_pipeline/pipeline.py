@@ -7,7 +7,6 @@ from flask import Flask, render_template, Response
 from flask_socketio import SocketIO
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-socketio = SocketIO(app)
 
 import os
 cwd = os.getcwd()
@@ -81,23 +80,23 @@ def main():
       provider, component, command, manual = parse_reference(item)
       components.add("{}/{}".format(provider, component))
 
-
+  events = []
   state = {
     "components": [],
     "pipeline": [],
     "running": [],
     "latest": {
-		"name": "terraform/vpc",
-		"commands": [
-			{"name": 'validate', "buildIdentifier": '21', "progress": 100},
-			{"name": 'test', "buildIdentifier": '21', "progress": 100},
-			{"name": 'package', "buildIdentifier": '21', "progress": 60},
-			{"name": 'plan', "buildIdentifier": '21', "progress": 0},
-			{"name": 'run', "buildIdentifier": '21', "progress": 0},
-			{"name": 'deploy', "buildIdentifier": '21', "progress": 0},
-			{"name": 'release', "buildIdentifier": '21', "progress": 0},
-			{"name": 'smoke', "buildIdentifier": '21', "progress": 0}
-		]
+    "name": "terraform/vpc",
+    "commands": [
+    {"name": 'validate', "buildIdentifier": '21', "progress": 100},
+    {"name": 'test', "buildIdentifier": '21', "progress": 100},
+    {"name": 'package', "buildIdentifier": '21', "progress": 60},
+    {"name": 'plan', "buildIdentifier": '21', "progress": 0},
+    {"name": 'run', "buildIdentifier": '21', "progress": 0},
+    {"name": 'deploy', "buildIdentifier": '21', "progress": 0},
+    {"name": 'release', "buildIdentifier": '21', "progress": 0},
+    {"name": 'smoke', "buildIdentifier": '21', "progress": 0}
+    ]
     }
   }
   for component in components:
@@ -140,6 +139,12 @@ def main():
   @app.route('/json')
   def return_json():
       return Response(json.dumps(state), content_type="application/json")
+
+
+  @app.route('/running')
+  def event_json():
+      event_response = Response(json.dumps(state["running"]), content_type="application/json")
+      return event_response
 
 
   import re
@@ -365,55 +370,49 @@ def main():
       "last_duration": ""
     }
 
+  job_monitors = {}
+  def begin_pipeline(run_groups):
+      if "monitor" in job_monitors:
+          print("Already began")
+          return
+      class JobMonitor(Thread):
+        def run(self):
+             for group in run_groups:
+                 group_handles = []
+                 print("Beginning group of {} items in paralell".format(len(group)))
+                 for item in group:
+                     if not is_running(item):
+                         state["running"].append({"reference": item})
 
-  def begin_pipeline(run_groups, socketio=None):
-        class JobMonitor(Thread):
-            def run(self):
-                 for group in run_groups:
-                     group_handles = []
-                     for item in group:
-                         if not is_running(item):
-                             state["running"].append({"reference": item})
+                         print("Running {}".format(item))
+                         provider, component, command, manual = parse_reference(item)
+                         builds, last_build_status, next_build = get_builds(args.environment, provider, component)
+                         print("")
 
-                             if socketio:
-                                 socketio.emit('event', {
-                                    "type": 'COMMAND_RUN',
-                                    "reference": item,
-                                    "status": "green"
-                                 })
-                             else:
-                                 print("Running {}".format(item))
-                             provider, component, command, manual = parse_reference(item)
-                             builds, last_build_status, next_build = get_builds(args.environment, provider, component)
-                             print("")
+                         previous_outputs = retrieve_outputs(item)
 
-                             previous_outputs = retrieve_outputs(item)
-
-                             handle = run_build(next_build,
-                               args.environment,
-                               item,
-                               provider,
-                               component,
-                               command,
-                               previous_outputs)
-                             group_handles.append((item, handle))
-                         else:
-                             print("Already running")
+                         handle = run_build(next_build,
+                           args.environment,
+                           item,
+                           provider,
+                           component,
+                           command,
+                           previous_outputs)
+                         group_handles.append((item, handle))
+                     else:
+                         print("Already running")
 
 
-                     print("Waiting for group to finish...")
-                     for node, handle in group_handles:
-                         handle.join()
-                         print("Group item finished")
-                         if socketio:
-                             socketio.emit('event', {
-                                 "type": 'COMMAND_FINISH',
-                                 "reference": node,
-                                 "status": "green"
-                             })
-                         remove_from_running(node)
+                 print("Waiting for group to finish...")
+                 for node, handle in group_handles:
+                     handle.join()
 
-        JobMonitor().start()
+                     print("Group item finished")
+                     remove_from_running(node)
+
+      job_monitor = JobMonitor()
+      job_monitors["monitor"] = job_monitor
+      job_monitor.start()
 
   if not args.show:
     finished_builds = {}
@@ -431,14 +430,8 @@ def main():
     run_groups = scheduler.parallelise_components(loaded_components)
 
     if args.gui:
-        @socketio.on('join')
-        def handle_message(message):
-            pprint(message)
-            begin_pipeline(run_groups, socketio)
-            socketio.emit('message', {'data': 'foobar'})
-        socketio.run(app)
-    else:
         begin_pipeline(run_groups)
+        app.run()
 
     sys.exit(1)
 
