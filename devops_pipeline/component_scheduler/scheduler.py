@@ -18,6 +18,7 @@ def parallelise_components(component_data):
 
     for component in component_data:
         this_var = component_vars[component["name"]]
+        model.Minimize(this_var.start)
         for ancestor in component["ancestors"]:
             model.Add(component_vars[ancestor].start < this_var.start)
         for successor in component["successors"]:

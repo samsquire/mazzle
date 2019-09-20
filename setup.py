@@ -13,7 +13,8 @@ setup(
         'websockets',
         'flask-socketio',
         'eventlet',
-        'python-socketio'
+        'python-socketio',
+        'SQLAlchemy'
     ],
     entry_points = {
       "console_scripts": ['devops-pipeline=devops_pipeline.pipeline:main', 'parallel-pipeline=devops_pipeline.parallel:main']
