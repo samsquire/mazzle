@@ -13,6 +13,7 @@ import os
 cwd = os.getcwd()
 print(cwd)
 
+import psutil
 from argparse import ArgumentParser
 from networkx.drawing.nx_pydot import read_dot, write_dot
 from networkx.readwrite import json_graph
@@ -169,7 +170,7 @@ def main():
           if "log_file" in item:
               item["current_size"] = os.stat(item["log_file"]).st_size
               if item["last_size"] != 0:
-                  item["progress"] = item["current_size"] / item["last_size"]
+                  item["progress"] = (item["current_size"] / item["last_size"]) * 100
       return Response(json.dumps(state), content_type="application/json")
 
     from flask import request
@@ -344,23 +345,36 @@ def main():
         class CommandRunner(Thread):
             def run(self):
               self.error = False
+
+              builds_filename = get_builds_filename(environment, provider, component, command)
+              ensure_file(builds_filename)
+              build_data = json.loads(open(builds_filename).read())
+              this_build = build_data["builds"][-1]
+
               if not os.path.isfile(os.path.join(provider, command)):
+                builds_filename = get_builds_filename(environment, provider, component, command)
+                ensure_file(builds_filename)
+                build_data = json.loads(open(builds_filename).read())
+                this_build = build_data["builds"][-1]
                 print("Not implemented")
                 build_data["builds"].append(this_build)
                 this_build["success"] = True
-                open("outputs/{}-{}-{}-{}.json".format(provider, component, command, pretty_build_number), 'w').write("{}")
+                open("outputs/{}-{}-{}.json".format(provider, component, command), 'w').write("{}")
                 write_builds_file(builds_filename, build_data)
-
+                remove_from_running(dependency)
                 return
 
-              if args.rebuild and dependency not in args.rebuild:
-                  print("Skipping due to rebuild")
-                  return
+              #if args.rebuild and dependency not in args.rebuild:
+            #      print("Skipping due to rebuild")
+            #      return
               pprint(env)
               runner = Popen([command,
                  environment,
                  component], cwd=provider, stdout=log_file, stderr=log_file,
                  env=env)
+
+              this_build["pid"] = runner.pid
+              write_builds_file(builds_filename, build_data)
 
               print("{}".format(log_file.name))
               runner.communicate(input=None, timeout=None)
@@ -370,13 +384,15 @@ def main():
 
               if runner.returncode != 0:
                 this_build["success"] = False
+                del this_build["pid"]
                 print("{} {} Build failed {}".format(dependency, pretty_build_number, runner.returncode))
                 self.error = True
                 build_data["builds"].append(this_build)
                 write_builds_file(builds_filename, build_data)
+                remove_from_running(dependency)
                 return
 
-              decoded = json.loads(open("{}/build/{}.{}.outputs.json".format(provider, component, command)).read())
+              decoded = json.loads(open("outputs/{}-{}-{}.json".format(provider, component, command)).read())
 
               if 'secrets' in decoded:
                 secrets = decoded.pop('secrets')
@@ -391,7 +407,7 @@ def main():
                 decoded["secrets"] = encrypted_secrets.decode('utf-8')
 
               # Write our outputs to the output bucket
-              output_filename = "outputs/{}-{}-{}.json".format(provider, component, pretty_build_number)
+              output_filename = "outputs/{}-{}-{}.json".format(provider, component, command)
               with open(output_filename, 'w') as output_file:
                 output_file.write(json.dumps(decoded))
               run(["aws", "s3", "cp", output_filename, "s3://vvv-{}-outputs/{}/{}/{}.json".format(environment, provider, component, pretty_build_number)])
@@ -437,7 +453,7 @@ def main():
               continue
           print("Successful build found for {}".format(parent))
           pretty_build_number = "{:0>4d}".format(last_successful_build["build_number"])
-          output_filename = "outputs/{}-{}-{}-{}.json".format(parent_provider, parent_component, parent_command, pretty_build_number)
+          output_filename = "outputs/{}-{}-{}.json".format(parent_provider, parent_component, parent_command)
           if not os.path.isfile(output_filename):
               run(["aws", "s3", "cp", "s3://vvv-{}-outputs/{}/{}/{}.json".format(environment, parent_provider, parent_component, pretty_build_number),
                 output_filename])
@@ -584,6 +600,16 @@ def main():
             reduce(lambda previous, current: previous + len(current), run_groups, 0),
             len(state["components"]))
       })
+
+      # find running processes from last run
+
+      for node in ordering:
+          provider, component, command, manual = parse_reference(node)
+          builds, last_success, next_build = get_builds(args.environment, provider, component, command)
+          for build in builds:
+              if "pid" in build and psutil.pid_exists(build["pid"]):
+                  state["running"].append(build)
+
 
     if args.gui:
         app.run()
