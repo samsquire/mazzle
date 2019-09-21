@@ -1,8 +1,21 @@
 # devops-pipeline
 
-This tool chains together common DevOps tools into a pipeline. A single code repository contains your packer, chef, terraform code. 
+**Prototype code** This is a prototype and the code is not refactored. YMMV
 
-Model the data flow of your tools in a Graphviz graph file and this tool can orchestrate your tools to bring up your entire environment with one command. The tool will validate, apply, test and package each of your tools in the correct order.
+[ui screenshot](docs/parallel-components.png)
+
+This tool chains together common DevOps tools into a pipeline. A single code repository contains your infrastructure code.
+
+Model the data flow of your tools as a Graphviz graph file and this tool can orchestrate your tools to bring up your entire environment with one command. The tool will validate, apply, test and package each of your tools in the correct order.
+
+# Modelling your infrastructure in Graphviz
+
+Each node in your architecture graph should be named `provider/component` When devops-pipeline runs, it expands the graph into one it can actually execute. This includes the full lifecycle of a component. This is:
+
+`validate` -> `test` -> `run` -> `package`
+
+`terraform/webserver/run` is a reference to the `terraform` provider which is the directory of terraform code.  `webserver` is the component and `run` is a command. Commands are shell scripts in the provider directory so you can extend
+
 
 ## Example – an AMI pipeline
 
