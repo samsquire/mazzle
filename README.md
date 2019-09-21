@@ -2,20 +2,19 @@
 
 **Prototype code** This is a prototype and the code is not refactored. YMMV
 
-![ui screenshot](docs/parallel-components.png)
-
 This tool chains together common DevOps tools into a pipeline. A single code repository contains your infrastructure code.
 
 Model the data flow of your tools as a Graphviz graph file and this tool can orchestrate your tools to bring up your entire environment with one command. The tool will validate, apply, test and package each of your tools in the correct order.
 
+![ui screenshot](docs/parallel-components.png)
+
 # Modelling your infrastructure in Graphviz
 
-Each node in your architecture graph should be named `provider/component` When devops-pipeline runs, it expands the graph into one it can actually execute. This includes the full lifecycle of a component. This is:
+Each node in your architecture graph should be named `provider/component` When devops-pipeline runs, it expands the graph into one with the full lifecycle. This includes the full lifecycle of a component. This is:
 
 `validate` -> `test` -> `run` -> `package`
 
-`terraform/webserver/run` is a reference to the `terraform` provider which is the directory of terraform code.  `webserver` is the component and `run` is a command. Commands are shell scripts in the provider directory so you can extend
-
+`terraform/webserver/run` is a reference to the `terraform` provider which is the directory of terraform code.  `webserver` is the component and `run` is a command. Commands are shell scripts in the provider directory so you can extend devops-pipeline with your own commands.
 
 ## Example – an AMI pipeline
 
@@ -43,7 +42,7 @@ See [fun-infra repo](https://github.com/samsquire/fun-infra)
 * Sets up a Prometheus instance for monitoring instances.
 * Installs node_exporter on Vault, NAT instance and bastion.
 * Sets up a Certificate authority on a Hashicorp Vault server instance.
-* Initializes the Vault automatically and encrypts the secrets.
+* Initializes the Vault automatically and encrypts the Vault init secrets.
 * Creates an AMI with the certificate authority certificate pre-installed.
 
 # Supported tools
@@ -55,11 +54,9 @@ See [fun-infra repo](https://github.com/samsquire/fun-infra)
 
 # Usage
 
-The tool will try avoid doing work that it doesn't need to do. It accomplishes this via Git tagging.
-
-To re-build everything in an environment, we run:
+To re-build everything in an environment, we run and open localhost:5000 and click Environments an click Run Pipeline.
 ```
-devops-pipeline environment
+devops-pipeline environment --gui
 ```
 
 
