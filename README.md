@@ -2,7 +2,7 @@
 
 **Prototype code** This is a prototype and the code is not refactored. YMMV
 
-[ui screenshot](docs/parallel-components.png)
+![ui screenshot](docs/parallel-components.png)
 
 This tool chains together common DevOps tools into a pipeline. A single code repository contains your infrastructure code.
 
