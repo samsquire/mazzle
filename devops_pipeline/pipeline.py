@@ -171,6 +171,7 @@ def main():
               item["current_size"] = os.stat(item["log_file"]).st_size
               if item["last_size"] != 0:
                   item["progress"] = (item["current_size"] / item["last_size"]) * 100
+      state["running"] = sorted(state["running"], key=lambda item: item["reference"])
       return Response(json.dumps(state), content_type="application/json")
 
     from flask import request
@@ -336,7 +337,8 @@ def main():
                 this_build["log_file"] = log_filename
             except Exception as e:
                 pass
-
+        build_data["builds"].append(this_build)
+        write_builds_file(builds_filename, build_data)
     # tag pending before build
     # run(["git", "tag", "pipeline/pending/{}/{}/{}/{}".format(environment, provider, component,
     #    pretty_build_number)], stdout=PIPE)
@@ -370,7 +372,7 @@ def main():
               pprint(env)
               runner = Popen([command,
                  environment,
-                 component], cwd=provider, stdout=log_file, stderr=log_file,
+                 component], cwd=provider, stdin=sys.stdin, stdout=log_file, stderr=log_file,
                  env=env)
 
               this_build["pid"] = runner.pid
@@ -516,7 +518,7 @@ def main():
                      break
 
                  group_handles = []
-                 print("")
+
                  matched = list(apply_pattern(pattern, group))
 
 
@@ -541,7 +543,7 @@ def main():
                             print("Skipping manual build {}".format(item))
                             remove_from_running(item)
                             continue
-                         print("")
+
 
                          previous_outputs = retrieve_outputs(environment, item)
                          if not previous_outputs:

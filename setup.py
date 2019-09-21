@@ -7,6 +7,7 @@ setup(
     install_requires=[
         'flask',
         'pydotplus',
+        'psutil',
         'networkx',
         'boto3',
         'ansible',
