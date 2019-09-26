@@ -2,24 +2,51 @@
 
 **Prototype code** This is a prototype YMMV
 
+This simple build tool builds infrastructure for environments on the fly. It is meant to be a cross between a continuous integration server, build server or task runner. I call it a runserver.
+
+## input file architecture.dot Graphviz dot dyntax
+
+This tool executes this [dot syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) graph of an entire environment. This is an example environment that brings up a Vault with prometheus:
+
+![ui screenshot](docs/architecture.png)
+
+# ui of software development lifecycle
+
+It has a web GUI to show status of your infrastructure like a build server or inventory system.
+
+Show all your `components` separately:
+
+![ui screenshot](docs/component-view.png)
+
+Show a `command` with log output.
+
+![ui screenshot](docs/command-view.png)
+
+# performance optimisations
+
+It designed to be ran every few minutes, while you're making changes to your infrastructure or upon commit. It is your unit testing. It uses some performance optimizations to make this possible such as running in parallel and detecting when things need to be rebuilt. I am working on parallel workers now.
+
+![ui screenshot](docs/parallel-components.png)
+
+# Introduction
+
 devops-pipeline is a command line tool to coordinate bringing up environments and running a chain of different devops tools.
 
-* `devops-pipeline` is a command line tool to bring up environments by coordinating other tools
-* You need to specify the dependencies between your tools.
-* You model the data flow of your tools as a Graphviz graph file. This tool can orchestrate your tools in parallel to bring up an entire environment with one command. The tool will validate, apply, test and package each of your tools in the correct order.
+* `devops-pipeline` coordinates other tools
+* To configure, you write a `dot` file explaining the relationships between each tool.
+* You can bring up an entire environment with one command
+* The tool will validate, apply, test and package each of your tools in the correct order.
 * Environment variables are how data is shared between tools.
 * devops-pipeline is meant to be cheap to run; you run it after making a change. Your tests
 
-![ui screenshot](docs/parallel-components.png)
-![ui screenshot](docs/component-view.png)
-![ui screenshot](docs/command-view.png)
-![ui screenshot](docs/architecture.png)
+
+
 
 # Modelling your infrastructure in Graphviz
 
 Each node in your architecture graph should be named `provider/component` When devops-pipeline runs, it expands the graph into one with the full lifecycle. This includes the full lifecycle of a component. This is:
 
-`validate` -> `test` -> `run` -> `package`
+`package` -> `validate` -> `test` -> `run`
 
 `terraform/webserver/run` is a reference to the `terraform` provider which is the directory of terraform code.  `webserver` is the component and `run` is a command. Commands are shell scripts in the provider directory so you can extend devops-pipeline with your own commands.
 
