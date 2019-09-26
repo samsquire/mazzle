@@ -16,6 +16,10 @@ It has a web GUI to show status of your infrastructure like a build server or in
 
 Show all your `components` separately:
 
+![ui screenshot](docs/components-view.png)
+
+Can look at the lifecycle of a component:
+
 ![ui screenshot](docs/component-view.png)
 
 Show a `command` with log output.
