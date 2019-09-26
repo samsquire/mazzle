@@ -14,6 +14,10 @@ This tool executes this [dot syntax](https://en.wikipedia.org/wiki/DOT_(graph_de
 
 It has a web GUI to show status of your infrastructure like a build server or inventory system.
 
+Show your environments:
+
+![ui screenshot](docs/environments-view.png)
+
 Show all your `components` separately:
 
 ![ui screenshot](docs/components-view.png)
