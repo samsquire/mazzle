@@ -4,7 +4,7 @@
 
 This simple build tool builds infrastructure for environments on the fly. It is meant to be a cross between a continuous integration server, build server or task runner. I call it a runserver.
 
-## input file architecture.dot Graphviz dot dyntax
+## input file architecture.dot of Graphviz dot syntax
 
 This tool executes this [dot syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) graph of an entire environment. This is an example environment that brings up a Vault with prometheus:
 
