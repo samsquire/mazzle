@@ -1,0 +1,4 @@
+digraph G {
+  rankdir="LR";
+  "ansible/machines" -> "gradle/app" -> "ansible/deploy" -> "ansible/release";
+}

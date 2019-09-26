@@ -1,12 +1,19 @@
 # devops-pipeline
 
-**Prototype code** This is a prototype and the code is not refactored. YMMV
+**Prototype code** This is a prototype YMMV
 
-This tool chains together common DevOps tools into a pipeline. A single code repository contains your infrastructure code.
+devops-pipeline is a command line tool to coordinate bringing up environments and running a chain of different devops tools.
 
-Model the data flow of your tools as a Graphviz graph file and this tool can orchestrate your tools to bring up your entire environment with one command. The tool will validate, apply, test and package each of your tools in the correct order.
+* `devops-pipeline` is a command line tool to bring up environments by coordinating other tools
+* You need to specify the dependencies between your tools.
+* You model the data flow of your tools as a Graphviz graph file. This tool can orchestrate your tools in parallel to bring up an entire environment with one command. The tool will validate, apply, test and package each of your tools in the correct order.
+* Environment variables are how data is shared between tools.
+* devops-pipeline is meant to be cheap to run; you run it after making a change. Your tests
 
 ![ui screenshot](docs/parallel-components.png)
+![ui screenshot](docs/component-view.png)
+![ui screenshot](docs/command-view.png)
+![ui screenshot](docs/architecture.png)
 
 # Modelling your infrastructure in Graphviz
 
