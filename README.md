@@ -32,7 +32,7 @@ Show a `command` with log output.
 
 # performance optimisations
 
-It designed to be ran every few minutes, while you're making changes to your infrastructure or upon commit. It is your unit testing. It uses some performance optimizations to make this possible such as running in parallel and detecting when things need to be rebuilt. I am working on parallel workers now.
+It meant to be ran every few minutes, while you're making changes to your infrastructure or upon commit. It is your unit testing. It uses some performance optimizations to make this possible such as running in parallel and detecting when things need to be rebuilt. I am working on parallel workers now.
 
 ![ui screenshot](docs/parallel-components.png)
 
@@ -66,6 +66,7 @@ digraph G {
   "chef/java" -> "packer/ubuntu-java" -> "terraform/ubuntu-java";
 }
 ```
+
 # Example - Using Ansible to provision Gradle apps in the cloud
 
 The following is a pipeline of ansible, a gradle build, ansible to deploy and ansible to release the app.
@@ -149,10 +150,10 @@ Each node in your architecture graph should be named `provider/component`
 
 The word after the tool name is the component name.
 
-# Example - Managing the lifecycle of volumes, AMIs and system packages
+# Managing the lifecycle of volumes, AMIs and system packages
 
 
-Resources such as volumes, system packages and AMIs change infrequently and remain for an extended period. We can mark these resources as manually triggered resources with a '*' symbol. While your infrastructure changes rapidly around them, these are updated less frequently. Devops-pipeline will try avoid doing work it does not need to do.
+Resources such as volumes, system packages and AMIs change infrequently and remain for an extended period. We can mark these resources as manually triggered resources with a '*' symbol. While your infrastructure changes rapidly around them, these are updated less frequently.
 
 # Example - Prometheus and Vault cluster
 
@@ -166,7 +167,7 @@ See [fun-infra repo](https://github.com/samsquire/fun-infra)
 * Initializes the Vault automatically and encrypts the Vault init secrets.
 * Creates an AMI with the certificate authority certificate pre-installed.
 
-# Supported tools
+# Tools with examples
 
 * Chef
 * Packer
@@ -179,32 +180,3 @@ To re-build everything in an environment, we run and open localhost:5000 and cli
 ```
 devops-pipeline environment --gui
 ```
-
-
-## Full arguments
-
-```
-devops-pipeline environment \
-  --file architecture.dot \
-  –-show \
-  --key "Key comment or email" \
-  –-gui \
-  --no-trigger \
-  --force \
-  –-rebuild [component] \
-  --ignore [component]
-  ```
-
-`--file` overrides what file to run
-
-`--show` does not apply any changes and just shows what the tool would have done.
-
-`--no-trigger` prevents components from triggering other components.
-
-`--force` stops detection of changes and rebuilds every component.
-
-`--keys` a list of GPG key names or email addresses to encrypt secrets with
-
-`--ignore` if you don't want to rebuild a particular component, you can stop it running entirely
-
-`--gui` a rudimentary build monitor

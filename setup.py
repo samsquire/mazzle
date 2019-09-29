@@ -20,7 +20,8 @@ setup(
         'flask-socketio',
         'eventlet',
         'python-socketio',
-        'SQLAlchemy'
+        'SQLAlchemy',
+        'parallel-ssh'
     ],
     entry_points = {
       "console_scripts": ['devops-pipeline=devops_pipeline.pipeline:main']
