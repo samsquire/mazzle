@@ -1,18 +1,23 @@
 # devops-pipeline
 
-**Prototype code** This is a prototype YMMV
+**Prototype code** This is a prototype YMMV very much still in development
 
-This simple build tool builds infrastructure for environments on the fly. It is meant to be a cross between a continuous integration server, build server or task runner. I call it a runserver.
+This build tool builds infrastructure for environments on the fly. It is meant to be a cross between a continuous integration server, build server and task runner. I call it a runserver. Its primary purpose is to try create complicated environments from scratch in a repeatable and deterministic way.
 
-## input file architecture.dot of Graphviz dot syntax
+* This is the tool you run after making changes to your code.
+* It's what you run to run tests.
+* It's how you check to see if your changes have broken any thing.
+* It runs against your entire stack by default.
 
-This tool executes this [dot syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) graph of an entire environment. This is an example environment that brings up a Vault with prometheus:
+## pipelines as code - configure your data flow with dot syntax
+
+This tool executes this [dot syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) graph of an entire environment. This is a fairly complicated environment that has Bastion servers, Prometheus and Hashicorp Vault.
 
 ![ui screenshot](docs/architecture.png)
 
-# ui of software development lifecycle
+# traditional ui for your software development lifecycle
 
-It has a web GUI to show status of your infrastructure like a build server or inventory system.
+It has a web GUI to show status of builds of your infrastructure like a build server or inventory system.
 
 Show your environments:
 
@@ -26,13 +31,17 @@ Can look at the lifecycle of a component:
 
 ![ui screenshot](docs/component-view.png)
 
-Show a `command` with log output.
+Show a `command` with log file output.
 
 ![ui screenshot](docs/command-view.png)
 
 # performance optimisations
 
-It meant to be ran every few minutes, while you're making changes to your infrastructure or upon commit. It is your unit testing. It uses some performance optimizations to make this possible such as running in parallel and detecting when things need to be rebuilt. I am working on parallel workers now.
+`devops-pipeline` is meant to be ran after each and every change to your infrastructure code. You should be able to change any two parts of your infrastructure and test the changes together, simultaneously. It is your unit testing. It uses some performance optimizations to make this possible.
+
+ * It calculates and runs in parallel what parts of your environment are safe to run at the same time.
+ * It detects if infrastructure code has been changed and whether or not it needs to be reran.
+ * It can run builds on SSH workers. You can use local builds to create and provision workers.
 
 ![ui screenshot](docs/parallel-components.png)
 
@@ -48,6 +57,19 @@ devops-pipeline is a command line tool to coordinate bringing up environments an
 * Environment variables are how data is shared between tools.
 * devops-pipeline is meant to be cheap to run; you run it after making a change. It works out what needs to rerun.
 
+# Usage
+
+```
+python3 ~/projects/devops_pipeline/devops_pipeline/pipeline.py \
+  home \
+  --file architecture.dot \
+  --gui \
+ --workers node1 node2 \
+ --workers-key /home/sam/projects/backup-infra/.vagrant/machines/node1/virtualbox/private_key \
+               /home/sam/projects/backup-infra/.vagrant/machines/node2/virtualbox/private_key \
+ --workers-user vagrant
+
+```
 
 # Example - An AMI Pipeline
 
@@ -176,7 +198,11 @@ See [fun-infra repo](https://github.com/samsquire/fun-infra)
 
 # Usage
 
-To re-build everything in an environment, we run and open localhost:5000 and click Environments an click Run Pipeline.
+To re-build everything in an environment, we run the following open localhost:5000 and click Environments an click Run Pipeline.
 ```
 devops-pipeline environment --gui
 ```
+
+# Todo
+
+# Creating new environments
