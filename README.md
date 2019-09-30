@@ -11,11 +11,11 @@ This build tool builds infrastructure for environments on the fly. It is meant t
 
 ## pipelines as code - configure your data flow with dot syntax
 
-This tool executes this [dot syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) graph of an entire environment. This is a fairly complicated environment that has Bastion servers, Prometheus and Hashicorp Vault.
+This tool executes a [dot syntax graph](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) of an entire environment. The following environment provisions a CI worker with Terraform and packer and provisions AMIs with Java and Bastion servers, Prometheus and Hashicorp Vault.
 
 ![ui screenshot](docs/architecture.png)
 
-# traditional ui for your software development lifecycle
+# traditional build ui for your software development lifecycle
 
 It has a web GUI to show status of builds of your infrastructure like a build server or inventory system.
 
@@ -105,11 +105,11 @@ digraph G {
 The following is the directory structure expected by `devops-pipeline` to run the above examples
 
 ```
-ansible
+ansible/playbooks
 ansible/run
-ansible/machines
-ansible/deploy
-ansible/release
+ansible/playbooks/machines
+ansible/playbooks/deploy
+ansible/playbooks/release
 gradle
 gradle/app
 gradle/run
@@ -174,7 +174,6 @@ The word after the tool name is the component name.
 
 # Managing the lifecycle of volumes, AMIs and system packages
 
-
 Resources such as volumes, system packages and AMIs change infrequently and remain for an extended period. We can mark these resources as manually triggered resources with a '*' symbol. While your infrastructure changes rapidly around them, these are updated less frequently.
 
 # Example - Prometheus and Vault cluster
@@ -205,4 +204,4 @@ devops-pipeline environment --gui
 
 # Todo
 
-# Creating new environments
+* Creating new environments from the UI
