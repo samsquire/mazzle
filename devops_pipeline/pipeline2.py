@@ -34,6 +34,14 @@ from subprocess import Popen, PIPE, run, call
 run_groups = []
 job_monitors = {}
 
+
+
+
+
+
+stream_workers = []
+doer_cache = {}
+
 def parse_reference(reference):
   full_provider, component_name, command = reference.split("/")
   provider = full_provider.replace("@", "")
@@ -204,6 +212,220 @@ def main():
 
     args = parser.parse_args()
 
+    def matcher(item, pattern):
+        if item.replace("@", "").startswith(pattern):
+            return True
+        if item.startswith(pattern):
+            return True
+        if item == pattern:
+            return True
+        if pattern == "":
+            return True
+        program = re.compile(pattern.replace("*", ".*"))
+        if program.match(item):
+            return True
+        return False
+
+
+    class Doer(Thread):
+        def __init__(self, item, index, doer_cache, environment, pattern):
+            super(Doer, self).__init__()
+            self.item = item
+            self.doer_cache = doer_cache
+            self.index = index
+            self.environment = environment
+            self.pattern = pattern
+
+        def run(self):
+            print(self.item)
+            if matcher(self.item, self.pattern):
+                print("Running {}".format(self.item))
+                do_work(self.environment, self.index, self.item)
+
+
+
+    class Grouper(Thread):
+        def __init__(self, previous_grouper, run_groups, doer_cache, environment, pattern):
+            super(Grouper, self).__init__()
+            self.previous_grouper = previous_grouper
+            self.run_groups = run_groups
+            self.doer_cache = doer_cache
+            self.environment = environment
+            self.pattern = pattern
+
+        def run(self):
+            doers = []
+            for index, group in enumerate(self.run_groups):
+                if group in doer_cache:
+                    doer = doer_cache[group]
+                    doer_cache[group].join()
+                else:
+                    doer = Doer(group, index, doer_cache, self.environment, self.pattern)
+                    doer.start()
+                    doer_cache[group] = doer
+                doers.append(doer)
+
+            print("waiting for doer with same index")
+            if self.previous_grouper:
+                self.previous_grouper.join()
+
+
+    class StreamWorker(Thread):
+        def __init__(self, streams, doer_cache, environment, pattern):
+            super(StreamWorker, self).__init__()
+            self.streams = streams
+            self.doer_cache = doer_cache
+            self.environment = environment
+            self.pattern = pattern
+
+        def run(self):
+            doers = []
+
+            print([self.streams[i][0:2] for i in range(0, 2)])
+
+            for group in self.streams:
+                doer = Grouper(group, doer_cache, self.environment, self.pattern)
+                doers.append(doer)
+                doer.start()
+
+            for doer in doers:
+                doer.join()
+
+
+    def do_work(environment, index, item):
+         os.chdir(project_directory)
+         if args.only and item not in args.only:
+             print("Skipping {}".format(item))
+             return
+
+
+         if not is_running(item):
+
+
+             print("Running {}".format(item))
+             provider, component, command, manual, local = parse_reference(item)
+
+             builds, last_build_status, next_build = get_builds(environment,
+                provider, component, command)
+             last_successful = find_last_successful_build(builds)
+
+             if manual:
+                for rebuild_item in args.rebuild:
+                    if item.startswith(rebuild_item):
+                        print("Skipping manual build {}".format(item))
+                        remove_from_running(item)
+                        return
+
+             component_paths_script = os.path.join(provider, "component-paths")
+             if not args.force and last_successful and os.path.isfile(component_paths_script):
+
+                component_paths_output = run(["component-paths", environment, component],
+                    cwd=os.path.join(project_directory, provider), stdout=PIPE).stdout.decode('utf-8').strip()
+                component_paths = component_paths_output.split("\n")
+
+                last_run_path = get_last_run_path(environment, provider, component, command)
+
+                if os.path.isfile(last_run_path):
+                    find_command = ["find"] + component_paths + ["(", "-path", "*.state", "-o", "-path",
+                    "*.terraform", ")", "-prune", "-o", "-newer", os.path.abspath(last_run_path), "-print"]
+                    print(" ".join(find_command))
+                    changed_files = run(find_command,
+                        cwd=os.path.join(project_directory, provider),
+                        stdout=PIPE).stdout.decode('utf-8').split("\n")
+                    changed_files.pop()
+                    print(changed_files)
+                    if global_commands.index(command) != 0 and len(changed_files) == 0:
+                        print("Component {}/{} is up-to-date".format(component, command))
+                        return
+
+
+             previous_outputs = retrieve_outputs(environment, item)
+             if not previous_outputs:
+                 previous_outputs = {}
+
+             client = None
+             worker_index = 0
+             if args.workers:
+                 worker_index = index % len(args.workers)
+                 hosts = args.workers[worker_index]
+
+             pipeline_position = global_commands.index(command)
+             if pipeline_position == 0:
+                 os.chdir(project_directory)
+                 artifacts_path = os.path.abspath(os.path.join(project_directory, "builds/artifacts"))
+                 destination = "{}.{}.{}.{}.tgz".format(environment, provider, component, next_build)
+                 # package for a build
+                 source = provider
+                 archive = "{}".format(os.path.join(artifacts_path, destination))
+                 package = Popen(["tar", "chvzf", archive, source],
+                    stdout=open('tarout', 'w'))
+                 package.communicate()
+                 work_dir = project_directory
+
+
+             else:
+                 # unpack last artifacts
+                 print("Retrieving previous artifacts...")
+                 parent_command = "package"
+                 parent_builds, last_build_status, _ = get_builds(environment, provider, component, parent_command)
+                 last_successful_build = find_last_successful_build(parent_builds)
+                 print(last_successful_build["build_number"])
+                 if not last_successful_build:
+                    return
+                 artifacts_path = os.path.abspath("builds/artifacts")
+                 last_successful_build_number = last_successful_build["build_number"]
+                 last_artifact_name = "{}.{}.{}.{}.tgz".format(environment, provider, component, last_successful_build_number)
+                 source_artifact = os.path.abspath(os.path.join("builds/artifacts", last_artifact_name))
+                 print("Source artifact {}".format(source_artifact))
+                 print("Last artifact name {}".format(last_artifact_name))
+                 work_dir_name = "{}_{}_{}_{}_{}".format(environment, provider, component, command, next_build)
+                 work_dir_path = os.path.abspath(os.path.join("builds/work", work_dir_name))
+                 if not os.path.isdir(work_dir_path):
+                     os.makedirs(work_dir_path)
+
+                 unpack = Popen(["tar", "xvf", "{}".format(os.path.join(source_artifact))], stdout=open('tarout', 'w'), cwd=work_dir_path)
+
+                 unpack.communicate()
+                 work_dir = work_dir_path
+
+
+                 if args.workers:
+                     print("Uploading {} to workers...".format(source_artifact))
+                     client = SSHClient(hosts, user=args.workers_user, pkey=args.workers_key[worker_index])
+                     cmds = client.scp_send(source_artifact, last_artifact_name)
+                     # joinall(cmds, raise_error=True)
+
+
+             if local == False and client != None:
+                 print("Running SSH build")
+                 handle = run_worker_build(client,
+                    hosts[0], last_artifact_name,
+                    next_build,
+                    environment,
+                    item,
+                    provider,
+                    component,
+                    command,
+                    previous_outputs,
+                    builds)
+                 os.chdir(project_directory)
+
+
+             else:
+                 print("Running normal build")
+                 handle = run_build(
+                   work_dir,
+                   next_build,
+                   environment,
+                   item,
+                   provider,
+                   component,
+                   command,
+                   previous_outputs,
+                   builds)
+                 os.chdir(project_directory)
+
+
     global_commands = ["package", "validate", "plan", "run", "test", "publish"]
 
     dot_graph = read_dot(args.file)
@@ -218,7 +440,7 @@ def main():
         for previous, after in zip(steps, steps[1:]):
             G.add_edge("{}/{}".format(node, previous), "{}/{}".format(node, after))
         for parent in G.predecessors(node):
-            G.add_edge(parent, "{}/{}".format(node, "validate"))
+            G.add_edge(parent, "{}/{}".format(node, "package"))
         for children in G.successors(node):
             G.add_edge("{}/{}".format(node, "publish"), children)
         dot_graph.remove_node(node)
@@ -356,7 +578,7 @@ def main():
       data = request.get_json()
       print("Triggering {}".format(data["name"]))
       environment = data["environment"]
-      begin_pipeline(environment, run_groups, data["name"])
+      begin_pipeline(environment, streams, data["name"])
       return Response(headers={'Content-Type': 'application/json'})
 
     @app.route('/propagate', methods=["POST"])
@@ -364,8 +586,8 @@ def main():
       data = request.get_json()
       print("Propagating changes {}".format(data["name"]))
       environment = data["environment"]
-      begin_pipeline(environment, run_groups, "{}/package".format(data["name"]))
-      begin_pipeline(environment, run_groups, "{}/test".format(data["name"]))
+      begin_pipeline(environment, streams, "{}/package".format(data["name"]))
+      begin_pipeline(environment, streams, "{}/test".format(data["name"]))
       need_testing = G.successors("{}/publish".format(data["name"]))
       for successor in need_testing:
           print("{} needs testing due to change to {}".format(successor, data["name"]))
@@ -376,7 +598,7 @@ def main():
     def triggerEnvironment():
       data = request.get_json()
       pprint(data)
-      begin_pipeline(data["environment"], run_groups, "")
+      begin_pipeline(data["environment"], streams, "")
       return Response(headers={'Content-Type': 'application/json'})
 
     @app.route('/running')
@@ -745,17 +967,19 @@ def main():
           outputs_path = os.path.abspath(os.path.join(project_directory, "builds", output_filename))
 
           if os.path.isfile(outputs_path):
-              loaded_outputs = json.loads(open(outputs_path).read())
-              if 'secrets' in loaded_outputs:
-                decoder = Popen(["base64", "-d", "--wrap=0"], stdin=PIPE, stdout=PIPE, stderr=sys.stderr)
-                decrypter = Popen(["gpg", "--decrypt"], stdin=decoder.stdout, stdout=PIPE, stderr=sys.stderr)
-                decoder.stdin.write(loaded_outputs['secrets'].encode('utf-8'))
-                decoder.stdin.close()
-                decrypted_result, err = decrypter.communicate()
-                loaded_outputs['secrets'] = json.loads(decrypted_result.decode('utf-8'))
-                open(output_filename, 'w').write(json.dumps(loaded_outputs))
+              print(outputs_path)
+              if os.stat(outputs_path).st_size != 0:
+                  loaded_outputs = json.loads(open(outputs_path).read())
+                  if 'secrets' in loaded_outputs:
+                    decoder = Popen(["base64", "-d", "--wrap=0"], stdin=PIPE, stdout=PIPE, stderr=sys.stderr)
+                    decrypter = Popen(["gpg", "--decrypt"], stdin=decoder.stdout, stdout=PIPE, stderr=sys.stderr)
+                    decoder.stdin.write(loaded_outputs['secrets'].encode('utf-8'))
+                    decoder.stdin.close()
+                    decrypted_result, err = decrypter.communicate()
+                    loaded_outputs['secrets'] = json.loads(decrypted_result.decode('utf-8'))
+                    open(output_filename, 'w').write(json.dumps(loaded_outputs))
 
-              env.update(loaded_outputs)
+                  env.update(loaded_outputs)
         return env
 
     def create_jobs(environment, build):
@@ -776,188 +1000,30 @@ def main():
         }
 
 
+
     def apply_pattern(pattern, items):
-        def matcher(item):
-            if item.replace("@", "").startswith(pattern):
-                return True
-            if item.startswith(pattern):
-                return True
-            if item == pattern:
-                return True
-            if pattern == "":
-                return True
-            program = re.compile(pattern.replace("*", ".*"))
-            if program.match(item):
-                return True
-            return False
         return list(filter(matcher, items))
 
-    def begin_pipeline(environment, run_groups, pattern):
-      if "monitor" in job_monitors:
-          print("Already began")
+    def begin_pipeline(environment, streams, pattern):
+        class Streams(Thread):
+            def run(self):
+                previous_grouper = collections.defaultdict(None)
+                for index, stream in enumerate(streams):
+                    if index in previous_grouper:
+                        grouper = previous_grouper[index]
+                    else:
+                        grouper = None
+                    stream_worker = Grouper(grouper, stream, doer_cache, environment, pattern)
+                    stream_workers.append(stream_worker)
+                    stream_worker.start()
+                    previous_grouper[index] = stream_worker
+                for stream_worker in stream_workers:
+                    stream_worker.join()
 
-      class JobMonitor(Thread):
-        def run(self):
-             self.error = False
-             for group in run_groups:
-                 if self.error:
-                     print("Stopping due to build error")
-                     break
-
-                 group_handles = []
-
-                 matched = list(apply_pattern(pattern, group))
-
-
-                 for index, item in enumerate(matched):
-                     os.chdir(project_directory)
-                     if args.only and item not in args.only:
-                         print("Skipping {}".format(item))
-                         continue
-
-
-                     if not is_running(item):
-
-
-                         print("Running {}".format(item))
-                         provider, component, command, manual, local = parse_reference(item)
-
-                         builds, last_build_status, next_build = get_builds(environment,
-                            provider, component, command)
-                         last_successful = find_last_successful_build(builds)
-
-                         if manual:
-                            for rebuild_item in args.rebuild:
-                                if item.startswith(rebuild_item):
-                                    print("Skipping manual build {}".format(item))
-                                    remove_from_running(item)
-                                    continue
-
-                         component_paths_script = os.path.join(provider, "component-paths")
-                         if not args.force and last_successful and os.path.isfile(component_paths_script):
-
-                            component_paths_output = run(["component-paths", environment, component],
-                                cwd=os.path.join(project_directory, provider), stdout=PIPE).stdout.decode('utf-8').strip()
-                            component_paths = component_paths_output.split("\n")
-
-                            last_run_path = get_last_run_path(environment, provider, component, command)
-
-                            if os.path.isfile(last_run_path):
-                                find_command = ["find"] + component_paths + ["(", "-path", "*.state", "-o", "-path",
-                                "*.terraform", ")", "-prune", "-o", "-newer", os.path.abspath(last_run_path), "-print"]
-                                print(" ".join(find_command))
-                                changed_files = run(find_command,
-                                    cwd=os.path.join(project_directory, provider),
-                                    stdout=PIPE).stdout.decode('utf-8').split("\n")
-                                changed_files.pop()
-                                print(changed_files)
-                                if global_commands.index(command) != 0 and len(changed_files) == 0:
-                                    print("Component {}/{} is up-to-date".format(component, command))
-                                    continue
-
-
-                         previous_outputs = retrieve_outputs(environment, item)
-                         if not previous_outputs:
-                             previous_outputs = {}
-
-                         client = None
-                         worker_index = 0
-                         if args.workers:
-                             worker_index = index % len(args.workers)
-                             hosts = args.workers[worker_index]
-
-                         pipeline_position = global_commands.index(command)
-                         if pipeline_position == 0:
-                             artifacts_path = os.path.abspath(os.path.join(project_directory, "builds/artifacts"))
-                             destination = "{}.{}.{}.{}.tgz".format(environment, provider, component, next_build)
-                             # package for a build
-                             source = provider
-                             archive = "{}".format(os.path.join(artifacts_path, destination))
-                             package = Popen(["tar", "cvzf", archive, source],
-                                stdout=open('tarout', 'w'))
-                             package.communicate()
-                             work_dir = project_directory
-
-
-                         else:
-                             # unpack last artifacts
-                             print("Retrieving previous artifacts...")
-                             parent_command = "package"
-                             parent_builds, last_build_status, _ = get_builds(environment, provider, component, parent_command)
-                             last_successful_build = find_last_successful_build(parent_builds)
-                             print(last_successful_build["build_number"])
-                             if not last_successful_build:
-                                continue
-                             artifacts_path = os.path.abspath("builds/artifacts")
-                             last_successful_build_number = last_successful_build["build_number"]
-                             last_artifact_name = "{}.{}.{}.{}.tgz".format(environment, provider, component, last_successful_build_number)
-                             source_artifact = os.path.abspath(os.path.join("builds/artifacts", last_artifact_name))
-
-                             work_dir_name = "{}_{}_{}_{}_{}".format(environment, provider, component, command, next_build)
-                             work_dir_path = os.path.abspath(os.path.join("builds/work", work_dir_name))
-                             if not os.path.isdir(work_dir_path):
-                                 os.makedirs(work_dir_path)
-                             os.chdir(work_dir_path)
-                             unpack = Popen(["tar", "xvf", "{}".format(os.path.join(source_artifact)),
-                             "-C", work_dir_path], stdout=open('tarout', 'w'))
-                             unpack.communicate()
-                             work_dir = work_dir_path
-
-
-                             if args.workers:
-                                 print("Uploading {} to workers...".format(source_artifact))
-                                 client = SSHClient(hosts, user=args.workers_user, pkey=args.workers_key[worker_index])
-                                 cmds = client.scp_send(source_artifact, last_artifact_name)
-                                 # joinall(cmds, raise_error=True)
-
-
-                         if local == False and client != None:
-                             print("Running SSH build")
-                             handle = run_worker_build(client,
-                                hosts[0], last_artifact_name,
-                                next_build,
-                                environment,
-                                item,
-                                provider,
-                                component,
-                                command,
-                                previous_outputs,
-                                builds)
-                             os.chdir(project_directory)
-                             group_handles.append((item, handle))
-
-                         else:
-                             print("Running normal build")
-                             handle = run_build(
-                               work_dir,
-                               next_build,
-                               environment,
-                               item,
-                               provider,
-                               component,
-                               command,
-                               previous_outputs,
-                               builds)
-                             os.chdir(project_directory)
-                             group_handles.append((item, handle))
-
-
-
-                     else:
-                         print("Already running")
-
-
-                 print("Waiting for group to finish... {}".format(group))
-                 for node, handle in group_handles:
-                     handle.join()
-                     print("Group item finished")
-                     remove_from_running(node)
-                     if handle.error:
-                         self.error = True
-
-      job_monitor = JobMonitor()
-      job_monitors["monitor"] = job_monitor
-      job_monitor.start()
+                stream_workers.clear()
+                print("Finished")
+        stream_run = Streams()
+        stream_run.start()
 
 
 
@@ -967,17 +1033,24 @@ def main():
     loaded_components = []
     for count, node in enumerate(ordering):
         component_ancestors = list(ancestors(G, node))
+        predecessors = list(G.predecessors(node))
         successors = list(G.successors(node))
         loaded_components.append({
             "name": node,
-            "ancestors": component_ancestors,
+            "ancestors": predecessors,
             "successors": successors
         })
     from component_scheduler import scheduler
+    loaded = open("builds/loaded", "w")
+    pprint(loaded_components, stream=loaded)
     print("Scheduling components into run groups...")
-    run_groups = scheduler.parallelise_components(loaded_components)
+    streams = scheduler.parallelise_components(loaded_components)
 
-    open("builds/run_groups", "w").write(str(run_groups))
+    pprint(streams)
+    stream_file = open("builds/run_groups", "w")
+    pprint(streams, stream=stream_file)
+    stream_file.flush()
+    stream_file.close()
 
     print("Scheduling finished... Loading...")
     for environment in list(ordered_environments):
@@ -985,9 +1058,9 @@ def main():
         "name": environment,
         "progress": 100,
         "status": "ready",
-        "facts": "{} run groups, {} tasks {} components"
-            .format(len(run_groups),
-            reduce(lambda previous, current: previous + len(current), run_groups, 0),
+        "facts": "{} streams, {} tasks {} components"
+            .format(len(streams),
+            reduce(lambda previous, current: previous + len(current), streams, 0),
             len(state["components"]))
       })
 
@@ -1008,8 +1081,8 @@ def main():
     if args.gui:
         app.run()
     else:
-        for environment in ordered_environments:
-            begin_pipeline(environment, run_groups, "")
+        pass #for environment in ordered_environments:
+            #begin_pipeline(environment, run_groups, "")
 
 
 
