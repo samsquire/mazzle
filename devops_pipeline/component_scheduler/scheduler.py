@@ -1,7 +1,8 @@
+from threading import Thread
 import collections
 from ortools.sat.python import cp_model
 from pprint import pprint
-
+import json
 
 def parallelise_components(component_data):
     """Schedule components for maximum paralellism"""
@@ -10,34 +11,24 @@ def parallelise_components(component_data):
     component_vars = {}
     task_run = collections.namedtuple('task_run', 'start group')
     horizon = len(component_data)
-    lookup = {}
+
     for component in component_data:
-        lookup[component["name"]] = component
         suffix = component["name"]
         start_var = model.NewIntVar(0, horizon, 'start/' + suffix)
         group_var = model.NewIntVar(0, 100, 'group/' + suffix)
         component_vars[suffix] = task_run(start_var, group_var)
 
-    def recurse_ancestors(component, this_var):
-        for ancestor in lookup[component]["ancestors"]:
-            model.Add(component_vars[ancestor].start < this_var.start)
-            recurse_ancestors(ancestor, this_var)
     parallel_group = collections.defaultdict(list)
     successor_lookup = {}
-    ancestor_lookup = {}
     for component in component_data:
         this_var = component_vars[component["name"]]
-        # recurse_ancestors(component["name"], this_var)
+
         for ancestor in component["ancestors"]:
             model.Add(component_vars[ancestor].start < this_var.start)
             # model.Add(component_vars[ancestor].group == this_var.group)
         for successor in component["successors"]:
-
             model.Add(component_vars[successor].start > this_var.start)
         successor_lookup[component["name"]] = component["successors"]
-        ancestor_lookup[component["name"]] = component["ancestors"]
-
-
 
     solver = cp_model.CpSolver()
     status = solver.Solve(model)
@@ -47,42 +38,23 @@ def parallelise_components(component_data):
     roots = []
     threads = []
     thread_list = []
-    if not (status == cp_model.FEASIBLE or status == cp_model.OPTIMAL):
-        return
+    if status == cp_model.FEASIBLE or status == cp_model.OPTIMAL:
+        for component in component_data:
+            position = solver.Value(component_vars[component["name"]].start)
+            positions[component["name"]] = position
+            component["position"] = position
+            orderings[position].append(component["name"])
 
+        highest = max(positions.values())
+        items = list(orderings.keys())
+        results = []
 
-    for component in component_data:
-        position = solver.Value(component_vars[component["name"]].start)
-        positions[component["name"]] = position
-        print("{} is at {}".format(component["name"], position))
-        orderings[position].append(component["name"])
+        pprint(results)
 
+    return list(sorted(component_data, key=lambda item: item["position"])), orderings
 
-
-    afters = collections.defaultdict(list)
-    last_forks = []
-    for ordering in sorted(orderings):
-        forks = []
-        for index, fork in enumerate(orderings[ordering]):
-            forks.append(fork)
-            for parent in last_forks:
-                if parent in ancestor_lookup[fork]:
-                    afters[parent].append(fork)
-        last_forks = forks
-
-
-    for ordering in orderings:
-        threads.append(orderings[ordering])
-
-    def dict_to_list(things):
-        items = []
-        for key in sorted(things):
-            items.append(things[key])
-        return items
-
-
-    return threads
-
+#parallelisable_builds = parallelise_components(component_data=json.loads(open("../backup-infra/builds/loaded.json").read()))
+#pprint(parallelisable_builds)
 #parallelisable_builds = parallelise_components(component_data = [
 #
 #      {

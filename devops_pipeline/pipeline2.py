@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from threading import Thread
+from threading import Thread, Lock
 from functools import reduce
 import collections
 
@@ -31,16 +31,38 @@ from sys import stdout
 from pprint import pprint
 from subprocess import Popen, PIPE, run, call
 
+lock = Lock()
 run_groups = []
 job_monitors = {}
 
-
-
-
-
-
 stream_workers = []
 doer_cache = {}
+state = {
+"environments": [
+],
+"components": [],
+"pipeline": [],
+"running": [],
+"latest": [{
+"name": "terraform/vpc",
+"commands": [
+    {"name": 'validate', "buildIdentifier": '21', "progress": 100},
+    {"name": 'test', "buildIdentifier": '21', "progress": 100},
+    {"name": 'package', "buildIdentifier": '21', "progress": 60},
+    {"name": 'plan', "buildIdentifier": '21', "progress": 0},
+    {"name": 'run', "buildIdentifier": '21', "progress": 0},
+    {"name": 'deploy', "buildIdentifier": '21', "progress": 0},
+    {"name": 'release', "buildIdentifier": '21', "progress": 0},
+    {"name": 'smoke', "buildIdentifier": '21', "progress": 0}
+    ]
+}],
+"filtering": ""
+}
+
+def remove_from_running(reference):
+  for item in state["running"]:
+      if item["reference"] == reference:
+        state["running"].remove(item)
 
 def parse_reference(reference):
   full_provider, component_name, command = reference.split("/")
@@ -65,22 +87,32 @@ def render_pipeline(run_groups):
       for item in group:
           print("{}".format(item))
       print("")
-      step_outputs = retrieve_outputs(environment, item)
+      step_outputs, _ = retrieve_outputs(environment, item)
       print(step_outputs)
 
 def get_builds_filename(environment, provider, component, command):
     return os.path.join(project_directory, "builds/history/{}.{}.{}.{}.json".format(environment, provider, component, command))
 
+
 def ensure_file(build_file):
-  if not os.path.isfile(build_file):
-      open(build_file, 'w').write(json.dumps({
+  if (not os.path.isfile(build_file)) or (os.path.isfile(build_file) and os.stat(build_file).st_size == 0):
+      builds_file = open(build_file, 'w')
+      builds_file.write(json.dumps({
           "builds": []
       }, indent=4))
+      builds_file.flush()
+      builds_file.close()
+
+
+
 
 def get_builds(environment, provider, component, command):
+    lock.acquire()
     builds_file = get_builds_filename(environment, provider, component, command)
     ensure_file(builds_file)
-    build_data = json.loads(open(builds_file).read())
+    opened = open(builds_file)
+    build_data = json.loads(opened.read())
+    opened.close()
     builds = build_data["builds"]
     if len(builds) == 0:
         last_build_status = False
@@ -88,11 +120,13 @@ def get_builds(environment, provider, component, command):
     else:
         last_build_status = builds[-1]["success"]
         next_build = builds[-1]["build_number"] + 1
+    lock.release()
     return (builds, last_build_status, next_build)
 
 def write_builds_file(builds_filename, builds_data):
-    f = open(builds_filename, 'w')
+    f = open(builds_filename, 'w+')
     f.write(json.dumps(builds_data, sort_keys=True, indent=4))
+    f.flush()
     f.close()
 
 def get_outputs_filename(environment, provider, component, command):
@@ -138,8 +172,8 @@ class Component():
         output_filename = os.path.abspath(os.path.join(project_directory, "outputs/{}.{}.{}.{}.json".format(environment, provider, component, command)))
         with open(output_filename, 'w') as output_file:
           output_file.write(json.dumps(decoded))
-        run(["aws", "s3", "cp", output_filename, "s3://vvv-{}-outputs/{}/{}/{}/{}.json"
-            .format(environment, provider, component, command, pretty_build_number)])
+        # run(["aws", "s3", "cp", output_filename, "s3://vvv-{}-outputs/{}/{}/{}/{}.json"
+        #    .format(environment, provider, component, command, pretty_build_number)])
 
         # env.update(json.loads(outputs))
         # pprint(env)
@@ -183,7 +217,7 @@ class Component():
                 build["status"] = "unknown"
 
 
-
+        remove_from_running(self.reference)
         builds_filename = get_builds_filename(self.environment, self.provider, self.component, self.command)
         write_builds_file(builds_filename, {"builds": builds})
 
@@ -193,14 +227,16 @@ def main():
     parser = ArgumentParser(description="devops-pipeline")
     parser.add_argument("environment")
     parser.add_argument("--file", default="architecture.dot")
+    parser.add_argument("--discover-workers-from-output")
     parser.add_argument("--workers", nargs="+", default=[] )
     parser.add_argument("--workers-key", nargs="+", default=[])
-    parser.add_argument("--workers-user")
+    parser.add_argument("--workers-user", default=None)
     parser.add_argument("--keys", nargs="+", default=[] )
     parser.add_argument("--gui", action="store_true" )
     parser.add_argument("--force", action="store_true" )
     parser.add_argument("--only", nargs='+', default=[])
     parser.add_argument("--ignore", nargs='+', default=[])
+    parser.add_argument("--force-local", action="store_true", default=False)
     parser.add_argument("--rebuild", nargs='+', default=[])
     parser.add_argument("--manual", nargs='+', default=[])
     parser.add_argument("--no-trigger", action="store_true", default=False)
@@ -228,46 +264,52 @@ def main():
 
 
     class Doer(Thread):
-        def __init__(self, item, index, doer_cache, environment, pattern):
+        def __init__(self, component, index, threads, environment, pattern):
             super(Doer, self).__init__()
-            self.item = item
-            self.doer_cache = doer_cache
+            self.component = component
+            self.item = component["name"]
+            self.threads = threads
             self.index = index
             self.environment = environment
             self.pattern = pattern
 
         def run(self):
-            print(self.item)
+            for thread in self.component["ancestors"]:
+                if thread in self.threads:
+                    self.threads[thread].join()
+
             if matcher(self.item, self.pattern):
                 print("Running {}".format(self.item))
-                do_work(self.environment, self.index, self.item)
+                handle = do_work(self.environment, self.index, self.item)
+                if handle:
+                    handle.join()
 
 
 
     class Grouper(Thread):
-        def __init__(self, previous_grouper, run_groups, doer_cache, environment, pattern):
+        def __init__(self, run_groups, doer_cache, environment, pattern):
             super(Grouper, self).__init__()
-            self.previous_grouper = previous_grouper
             self.run_groups = run_groups
             self.doer_cache = doer_cache
             self.environment = environment
             self.pattern = pattern
 
+
         def run(self):
             doers = []
             for index, group in enumerate(self.run_groups):
                 if group in doer_cache:
-                    doer = doer_cache[group]
                     doer_cache[group].join()
                 else:
+                    print("Group", group)
                     doer = Doer(group, index, doer_cache, self.environment, self.pattern)
-                    doer.start()
                     doer_cache[group] = doer
-                doers.append(doer)
+                    doers.append(doer)
+                    doer.start()
 
-            print("waiting for doer with same index")
-            if self.previous_grouper:
-                self.previous_grouper.join()
+            for index, doer in enumerate(doers):
+                doer.join()
+
 
 
     class StreamWorker(Thread):
@@ -280,8 +322,6 @@ def main():
 
         def run(self):
             doers = []
-
-            print([self.streams[i][0:2] for i in range(0, 2)])
 
             for group in self.streams:
                 doer = Grouper(group, doer_cache, self.environment, self.pattern)
@@ -300,9 +340,6 @@ def main():
 
 
          if not is_running(item):
-
-
-             print("Running {}".format(item))
              provider, component, command, manual, local = parse_reference(item)
 
              builds, last_build_status, next_build = get_builds(environment,
@@ -339,15 +376,22 @@ def main():
                         return
 
 
-             previous_outputs = retrieve_outputs(environment, item)
+             previous_outputs, previous_outputs_raw = retrieve_outputs(environment, item)
              if not previous_outputs:
                  previous_outputs = {}
 
+             hosts = None
              client = None
              worker_index = 0
              if args.workers:
                  worker_index = index % len(args.workers)
                  hosts = args.workers[worker_index]
+            
+             if args.discover_workers_from_output and args.discover_workers_from_output in previous_outputs_raw:
+                available_workers = previous_outputs_raw[args.discover_workers_from_output]
+                worker_index = index % len(previous_outputs_raw[args.discover_workers_from_output])
+                hosts = available_workers[worker_index] 
+                print("Decided to use worker {}".format(hosts))
 
              pipeline_position = global_commands.index(command)
              if pipeline_position == 0:
@@ -369,9 +413,10 @@ def main():
                  parent_command = "package"
                  parent_builds, last_build_status, _ = get_builds(environment, provider, component, parent_command)
                  last_successful_build = find_last_successful_build(parent_builds)
-                 print(last_successful_build["build_number"])
                  if not last_successful_build:
                     return
+                 print(last_successful_build["build_number"])
+
                  artifacts_path = os.path.abspath("builds/artifacts")
                  last_successful_build_number = last_successful_build["build_number"]
                  last_artifact_name = "{}.{}.{}.{}.tgz".format(environment, provider, component, last_successful_build_number)
@@ -389,17 +434,21 @@ def main():
                  work_dir = work_dir_path
 
 
-                 if args.workers:
-                     print("Uploading {} to workers...".format(source_artifact))
-                     client = SSHClient(hosts, user=args.workers_user, pkey=args.workers_key[worker_index])
-                     cmds = client.scp_send(source_artifact, last_artifact_name)
-                     # joinall(cmds, raise_error=True)
+                 if hosts and args.force_local == False and local == False:
+                     print("Connecting to remote worker")
+                     client = ParallelSSHClient([hosts], user=args.workers_user, pkey=args.workers_key[worker_index % len(args.workers_key)])
+                     artifact_test = client.run_command("test -f {}".format(last_artifact_name))
+                     client.join(artifact_test)
+                     if artifact_test[hosts]["exit_code"] != 0:
+                         print("Uploading {} to workers...".format(source_artifact))
+                         cmds = client.copy_file(source_artifact, last_artifact_name)
+                         joinall(cmds, raise_error=True)
 
 
-             if local == False and client != None:
+             if args.force_local == False and local == False and client != None:
                  print("Running SSH build")
                  handle = run_worker_build(client,
-                    hosts[0], last_artifact_name,
+                    hosts, last_artifact_name,
                     next_build,
                     environment,
                     item,
@@ -412,7 +461,7 @@ def main():
 
 
              else:
-                 print("Running normal build")
+                 print("Running local build")
                  handle = run_build(
                    work_dir,
                    next_build,
@@ -424,7 +473,7 @@ def main():
                    previous_outputs,
                    builds)
                  os.chdir(project_directory)
-
+             return handle
 
     global_commands = ["package", "validate", "plan", "run", "test", "publish"]
 
@@ -458,27 +507,7 @@ def main():
         components.add("{}/{}".format(provider, component))
 
     events = []
-    state = {
-    "environments": [
-    ],
-    "components": [],
-    "pipeline": [],
-    "running": [],
-    "latest": [{
-    "name": "terraform/vpc",
-    "commands": [
-        {"name": 'validate', "buildIdentifier": '21', "progress": 100},
-        {"name": 'test', "buildIdentifier": '21', "progress": 100},
-        {"name": 'package', "buildIdentifier": '21', "progress": 60},
-        {"name": 'plan', "buildIdentifier": '21', "progress": 0},
-        {"name": 'run', "buildIdentifier": '21', "progress": 0},
-        {"name": 'deploy', "buildIdentifier": '21', "progress": 0},
-        {"name": 'release', "buildIdentifier": '21', "progress": 0},
-        {"name": 'smoke', "buildIdentifier": '21', "progress": 0}
-        ]
-    }],
-    "filtering": ""
-    }
+
     for environment in ordered_environments:
         for component in components:
             state["components"].append({
@@ -508,11 +537,6 @@ def main():
           if item["reference"] == reference:
             return True
       return False
-
-    def remove_from_running(reference):
-      for item in state["running"]:
-          if item["reference"] == reference:
-            state["running"].remove(item)
 
     @app.route('/environments')
     def environments():
@@ -578,7 +602,7 @@ def main():
       data = request.get_json()
       print("Triggering {}".format(data["name"]))
       environment = data["environment"]
-      begin_pipeline(environment, streams, data["name"])
+      begin_pipeline(environment, streams, orderings, data["name"])
       return Response(headers={'Content-Type': 'application/json'})
 
     @app.route('/propagate', methods=["POST"])
@@ -586,19 +610,29 @@ def main():
       data = request.get_json()
       print("Propagating changes {}".format(data["name"]))
       environment = data["environment"]
-      begin_pipeline(environment, streams, "{}/package".format(data["name"]))
-      begin_pipeline(environment, streams, "{}/test".format(data["name"]))
+      begin_pipeline(environment, streams, orderings, "{}/package".format(data["name"]))
+      begin_pipeline(environment, streams, orderings, "{}/test".format(data["name"]))
       need_testing = G.successors("{}/publish".format(data["name"]))
       for successor in need_testing:
           print("{} needs testing due to change to {}".format(successor, data["name"]))
       return Response(headers={'Content-Type': 'application/json'})
+
+    @app.route('/validate', methods=["POST"])
+    def validate():
+      data = request.get_json()
+      print("Validating stack {}".format(data["name"]))
+      environment = data["name"]
+      begin_pipeline(environment, streams, orderings, "*/*/validate")
+        
+      return Response(headers={'Content-Type': 'application/json'})
+
 
 
     @app.route('/trigger-environment', methods=["POST"])
     def triggerEnvironment():
       data = request.get_json()
       pprint(data)
-      begin_pipeline(data["environment"], streams, "")
+      begin_pipeline(data["environment"], streams, orderings, "")
       return Response(headers={'Content-Type': 'application/json'})
 
     @app.route('/running')
@@ -695,7 +729,7 @@ def main():
         return env
 
     def run_worker_build(client,
-        worker,
+        host,
         artifact,
         build_number,
         environment,
@@ -707,6 +741,9 @@ def main():
         builds):
         class Worker(Thread):
             def run(self):
+                exit_code_path = get_exit_code_path(project_directory, environment, provider, component, command, build_number)
+                if os.path.exists(exit_code_path):
+                    os.remove(exit_code_path)
                 self.error = False
                 builds_filename = get_builds_filename(environment, provider, component, command)
                 ensure_file(builds_filename)
@@ -740,23 +777,24 @@ def main():
                 print("Creating remote directories")
                 work_directory = "builds"
                 cmd = client.run_command("mkdir -p builds/exits")
-                # client.join(cmd)
+                client.join(cmd)
                 cmd = client.run_command("mkdir -p builds/outputs")
-                # client.join(cmd)
+                client.join(cmd)
                 cmd = client.run_command("mkdir -p builds/envs")
-                # client.join(cmd)
+                client.join(cmd)
+                cmd = client.run_command("mkdir -p builds/logs")
+                client.join(cmd)
 
                 env = construct_environment("", build_number, environment, provider, component, command, previous_outputs)
                 work_path = "builds/work/{}.{}.{}.{}".format(environment, provider, component, command)
                 make_work_path = client.run_command("mkdir -p {}".format(work_path))
-                # client.join(make_work_path)
+                client.join(make_work_path)
 
                 print("Unpacking artifact remotely")
                 unpack_command = "tar -xvf {} -C {}".format(artifact, work_path)
 
                 extract = client.run_command(unpack_command)
-                client.wait_finished(extract[0])
-                # client.join(extract)
+                client.join(extract)
                 env_file_name = "{}.{}.{}.{}.{}".format(environment, provider, component, command, build_number)
                 env_file_path = os.path.join(project_directory, "builds/envs/", env_file_name)
                 env_file = open(env_file_path, "w")
@@ -768,49 +806,70 @@ def main():
                 print("Sending envs file to worker")
                 remote_env_path = os.path.join("builds/envs", env_file_name)
                 cmds = client.scp_send(env_file_path, remote_env_path, True)
-                # joinall(cmds, raise_error=True)
+                joinall(cmds, raise_error=True)
                 ran_remotely = False
                 build_stdout = None
                 build_stderr = None
-                test_command = "test -f {}/{}/{} ; echo $?".format(work_path, provider, command)
+                test_command = "test -f {}/{}/{}".format(work_path, provider, command)
+                print(test_command)
                 print(work_path)
-                channel, hostname, stdout, stderr, stdin = client.run_command(test_command)
-                for line in stdout:
-                    if line == "0":
-                        print("Running build remotely")
-                        ran_remotely = True
-                        build_channel, hostname, build_stdout, build_stderr, stdin = client.run_command("""set -a ;
-                            source {} ;
-                            export OUTPUT_PATH=$(readlink -f ${{OUTPUT_PATH}}) ;
-                            export EXIT_CODE_PATH=$(readlink -f ${{EXIT_CODE_PATH}}) ;
-                            cd {}/{} ;
-                            ./{} {} {}""".format(remote_env_path, work_path, provider, command, environment, component))
-                    else:
-                        builds_filename = get_builds_filename(environment, provider, component, command)
-                        ensure_file(builds_filename)
-                        build_data = json.loads(open(builds_filename).read())
-                        this_build = build_data["builds"][-1]
-                        print("Not implemented")
-                        this_build["success"] = True
-                        open(os.path.join(project_directory,
-                            "outputs/{}.{}.{}.{}.outputs.json"
-                            .format(environment, provider, component, command)), 'w').write("{}")
-                        write_builds_file(builds_filename, build_data)
-                        remove_from_running(dependency)
-                        open(os.path.join(get_last_run_path(environment, provider, component, command)), 'w').write(':)')
-                        return
-                if ran_remotely:
-                    for line in build_stdout:
-                        print(line)
-                    for line in build_stderr:
-                        print(line)
-                    client.wait_finished(build_channel)
+                test_exists = client.run_command(test_command)
+                client.join(test_exists)
+                
+                if test_exists[host]["exit_code"] == 0:
+                    print("Running build remotely")
+                    ran_remotely = True
+                    remote_log_filename = "logs/{}-{}.{}.{}.{}.log".format(build_number, environment, provider, component, command)
+                    build_command = client.run_command("""set -a ;
+                        source {} ;
+                        export OUTPUT_PATH=$(readlink -f ${{OUTPUT_PATH}}) ;
+                        echo ${{OUTPUT_PATH}} ;
+                        export EXIT_CODE_PATH=$(readlink -f ${{EXIT_CODE_PATH}}) ;
+                        cd {}/{} ;
+                        ./{} {} {}""".format(remote_env_path, work_path, provider, command, environment, component, remote_log_filename))
+                        
+                else:
+                    builds_filename = get_builds_filename(environment, provider, component, command)
+                    ensure_file(builds_filename)
+                    build_data = json.loads(open(builds_filename).read())
+                    this_build = build_data["builds"][-1]
+                    print("Not implemented")
+                    this_build["success"] = True
+                    open(os.path.join(project_directory,
+                        "outputs/{}.{}.{}.{}.outputs.json"
+                        .format(environment, provider, component, command)), 'w').write("{}")
+                    write_builds_file(builds_filename, build_data)
                     remove_from_running(dependency)
-                    client.scp_recv(os.path.join("builds/outputs/{}.{}.{}.{}.outputs.json".format(environment, provider, component, command)),
-                        os.path.join(project_directory, "builds/outputs/{}.{}.{}.{}.outputs.json".format(environment, provider, component, command)))
-                    client.scp_recv(os.path.join("builds/exits/{}.{}.{}.{}.{}.exitcode".format(environment, provider, component, command, build_number)),
-                        os.path.join(project_directory, "builds/exits/{}.{}.{}.{}.{}.exitcode".format(environment, provider, component, command, build_number)))
+                    open(os.path.join(get_last_run_path(environment, provider, component, command)), 'w').write(':)')
+                    return
+                if ran_remotely:
+                    print("Setting up logs...")
+                    logfile = open("logs/{}-{}.{}.{}.{}.log".format(build_number, environment, provider, component, command), "w")
 
+                    client.join(build_command)
+                    for line in build_command[host]["stdout"]:
+                         logfile.write(line + "\n")
+                    for line in build_command[host]["stderr"]:
+                        logfile.write(line + "\n")
+                    print("Remote build finished")
+                    remove_from_running(dependency)
+                    
+                    print("Downloading outputs...")
+                    dest_output = os.path.join(project_directory, "builds/outputs/{}.{}.{}.{}.outputs.json".format(environment, provider, component, command))
+                                               
+                    receive_outputs = client.copy_remote_file(os.path.join("builds/outputs/{}.{}.{}.{}.outputs.json".format(environment, provider, component, command)), dest_output)
+                    
+                    joinall(receive_outputs)
+                    os.rename("{}_{}".format(dest_output, host), dest_output)
+                    
+                    print("Downloading exit code...")
+                    dest_exit_code = os.path.join(project_directory, "builds/exits/{}.{}.{}.{}.{}.exitcode".format(environment, provider, component, command, build_number))
+                    receive_exit_code = client.copy_remote_file(os.path.join("builds/exits/{}.{}.{}.{}.{}.exitcode".format(environment, provider, component, command, build_number)), dest_exit_code)
+                    
+                    joinall(receive_exit_code, raise_error=True)
+                    os.rename("{}_{}".format(dest_exit_code, host), dest_exit_code)
+                    
+                    print("Calculating build result")
                     Component(dependency, environment, provider, component, command).calculate_state()
 
         worker = Worker()
@@ -827,7 +886,6 @@ def main():
         command,
         previous_outputs,
         builds):
-        print("Running build")
 
 
         provider, component, command, manual, local = parse_reference(dependency)
@@ -899,8 +957,7 @@ def main():
               environment_filename = os.path.join(project_directory, "builds/environments/{}-{}-{}-{}.env".format(environment, provider, component, command))
               environment_file = open(environment_filename, 'w')
               environment_file.write(json.dumps(env, indent=4))
-
-
+                
               runner = Popen([command,
                  environment,
                  component], cwd=os.path.join(work_dir, provider), stdin=sys.stdin, stdout=log_file, stderr=log_file,
@@ -943,7 +1000,7 @@ def main():
         return None
 
     def retrieve_outputs(environment, node):
-        print("Retrieving outputs of {}".format(node))
+
         provider, component, command, manual, local = parse_reference(node)
         parents = list(ancestors(G, node))
 
@@ -962,12 +1019,17 @@ def main():
           pretty_build_number = "{:0>4d}".format(last_successful_build["build_number"])
           output_filename = "outputs/{}.{}.{}.{}.outputs.json".format(environment, parent_provider, parent_component, parent_command)
           if not os.path.isfile(output_filename):
-              run(["aws", "s3", "cp", "s3://vvv-{}-outputs/{}/{}/{}/{}.json".format(environment, parent_provider, parent_component, parent_command, pretty_build_number),
-                output_filename])
+              output_bucket = "vvv-{}-outputs".format(environment)
+              s3_filename = "{}/{}/{}/{}.json".format(environment, parent_provider, parent_component, parent_command, pretty_build_number)
+              s3_path = "s3://vvv-{}-outputs/{}/{}/{}/{}.json".format(environment, parent_provider, parent_component, parent_command, pretty_build_number)
+              # check = run(["aws", "s3api", "head-object", "--bucket", output_bucket, "--key", s3_filename], stderr=open("s3log", "w"))
+
+              #if check.returncode == 0:
+                #  pass # run(["aws", "s3", "cp", s3_path, output_filename])
           outputs_path = os.path.abspath(os.path.join(project_directory, "builds", output_filename))
 
           if os.path.isfile(outputs_path):
-              print(outputs_path)
+
               if os.stat(outputs_path).st_size != 0:
                   loaded_outputs = json.loads(open(outputs_path).read())
                   if 'secrets' in loaded_outputs:
@@ -980,7 +1042,15 @@ def main():
                     open(output_filename, 'w').write(json.dumps(loaded_outputs))
 
                   env.update(loaded_outputs)
-        return env
+                
+        unfiltered = dict(env)
+        for key, value in env.items():
+            if isinstance(value, list):
+                cleaned = list(filter(lambda x:x != "", env[key]))
+                unfiltered[key] = cleaned
+                env[key] = "\"" + \
+                " ".join(cleaned) + "\""
+        return env, unfiltered
 
     def create_jobs(environment, build):
         provider, component, command, manual, local = parse_reference(build)
@@ -1004,24 +1074,25 @@ def main():
     def apply_pattern(pattern, items):
         return list(filter(matcher, items))
 
-    def begin_pipeline(environment, streams, pattern):
+
+
+    def begin_pipeline(environment, streams, orderings, pattern):
         class Streams(Thread):
             def run(self):
-                previous_grouper = collections.defaultdict(None)
-                for index, stream in enumerate(streams):
-                    if index in previous_grouper:
-                        grouper = previous_grouper[index]
-                    else:
-                        grouper = None
-                    stream_worker = Grouper(grouper, stream, doer_cache, environment, pattern)
-                    stream_workers.append(stream_worker)
-                    stream_worker.start()
-                    previous_grouper[index] = stream_worker
-                for stream_worker in stream_workers:
-                    stream_worker.join()
 
-                stream_workers.clear()
-                print("Finished")
+                threads = {}
+
+                for index, component in enumerate(streams):
+                    # component, index, threads, environment, pattern
+                    if matcher(component["name"], pattern):
+                        new_thread = Doer(component, index, threads, environment, pattern)
+                        threads[component["name"]] = new_thread
+
+                for index in sorted(orderings):
+                    for component in orderings[index]:
+                        if matcher(component, pattern):
+                            threads[component].start()
+
         stream_run = Streams()
         stream_run.start()
 
@@ -1044,7 +1115,10 @@ def main():
     loaded = open("builds/loaded", "w")
     pprint(loaded_components, stream=loaded)
     print("Scheduling components into run groups...")
-    streams = scheduler.parallelise_components(loaded_components)
+    streams, orderings = scheduler.parallelise_components(loaded_components)
+
+    loaded_json_file = open("builds/loaded.json", "w")
+    loaded_json_file.write(json.dumps(loaded_components, indent=4))
 
     pprint(streams)
     stream_file = open("builds/run_groups", "w")
@@ -1058,9 +1132,8 @@ def main():
         "name": environment,
         "progress": 100,
         "status": "ready",
-        "facts": "{} streams, {} tasks {} components"
+        "facts": "{} tasks, {} components"
             .format(len(streams),
-            reduce(lambda previous, current: previous + len(current), streams, 0),
             len(state["components"]))
       })
 
