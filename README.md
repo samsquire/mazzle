@@ -17,7 +17,7 @@ This tool executes a [dot syntax graph](https://en.wikipedia.org/wiki/DOT_(graph
 
 # traditional build ui for your software development lifecycle
 
-It has a web GUI to show status of builds of your infrastructure like a build server or inventory system.
+It has a prototype web GUI to show status of builds of your infrastructure like a traditional build serverm.
 
 Show your environments:
 
