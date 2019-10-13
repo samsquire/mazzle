@@ -5,19 +5,46 @@
 This build tool builds infrastructure for environments on the fly. It is meant to be a cross between a continuous integration server, build server and task runner. I call it a runserver. Its primary purpose is to try create complicated environments from scratch in a repeatable and deterministic way.
 
 * This is the tool you run after making changes to your code.
-* It's what you run to run tests.
-* It's how you check to see if your changes have broken any thing.
+* It's what you run to begin tests.
+* It's how you check to see if your changes have broken any thing anywhere on your stack.
 * It runs against your entire stack by default.
 
 ## pipelines as code - configure your data flow with dot syntax
 
-This tool executes a [dot syntax graph](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) of an entire environment. The following environment provisions a CI worker with Terraform and packer and provisions AMIs with Java and Bastion servers, Prometheus and Hashicorp Vault.
+This tool executes a [dot syntax graph](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) of an entire environment. The following graph:
+
+ * provisions two CI workers with Ansible - future steps are executed on these workers
+ * provisions 3 AMI builds  - base image, authenticated image and java image
+ * Bastion servers
+ * Prometheus with Grafana
+ * Hashicorp Vault
 
 ![ui screenshot](docs/architecture.png)
 
+# component based infrastructure
+
+This tool sees infrastructure code in a certain way. Each run of a tool is a `component`. Components have names. Example components:
+
+ * **ansible/provision-machines** could be a ansible role that runs configuration management
+ * **packer/source-ami** could be a component that configures a base image for AWS
+ * **packer/developer-box** could be a component that configures a base machine for developers
+
+This tool runs these components with the following predefined lifecycle:
+
+* **package** packaging happens first to package up the code for workers
+* **validate** runs syntax checkers
+* **run**
+* **test*
+
+To run a command, devops-pipeline runs a shellscript with he same name in the component directory. For example, `ansible/machines/run` will do this:
+
+```
+./run <environment> <component_name>
+```
+
 # traditional build ui for your software development lifecycle
 
-It has a prototype web GUI to show status of builds of your infrastructure like a traditional build serverm.
+It has a prototype web GUI to show status of builds of your infrastructure like a traditional build server.
 
 Show your environments:
 
@@ -37,11 +64,13 @@ Show a `command` with log file output.
 
 # performance optimisations
 
-`devops-pipeline` is meant to be ran after each and every change to your infrastructure code. You should be able to change any two parts of your infrastructure and test the changes together, simultaneously. It is your unit testing. It uses some performance optimizations to make this possible.
+`devops-pipeline` is meant to be ran after each and every change to your infrastructure code. You should be able to change any two parts of your infrastructure and test the changes together, simultaneously. It to be used to trigger unit testing. It uses some performance optimizations to make this possible.
 
- * It calculates and runs in parallel what parts of your environment are safe to run at the same time.
+ * It calculates and runs in parallel what parts of your environment are safe to run at the same time where there are no data dependencies.
  * It detects if infrastructure code has been changed and whether or not it needs to be reran.
  * It can run builds on SSH workers. You can use local builds to create and provision workers.
+
+This is a screenshot showing the building of components that can run in parallel without impacting one another.
 
 ![ui screenshot](docs/parallel-components.png)
 
@@ -51,13 +80,27 @@ devops-pipeline is a command line tool to coordinate bringing up environments an
 
 * devops-pipeline coordinates other tools like Terraform, Ansible, Chef, shell scripts
 * To configure, you write a `dot` file explaining the relationships and data flow between each tool.
-* Data is shared between tools as environment variables
-* You specify your entire environment so you can bring up an entire environment with one command. Each person on your team could have an entire environment for themselves without trampling on each other's changes.
+* **Data is shared between tools as environment variables**
+* You specify the order of what tools are needed to be used to bring up an entire environment. Each person on your team could have an entire environment for themselves without trampling on each other's changes.
 * devops-pipeline runs all components with the same lifecycle of packaging, validation, running, testing
 * Environment variables are how data is shared between tools.
 * devops-pipeline is meant to be cheap to run; you run it after making a change. It works out what needs to rerun.
 
-# Usage
+# Worker support
+
+devops-pipeline can trigger builds on remote instances with SSH.
+
+`--discover-workers-from-output` looks for a space separated output with this name and uses the hostnames or IP addresses to SSH onto and run builds.
+
+```
+python3 ~/projects/devops_pipeline/devops_pipeline/pipeline2.py home \
+    --file architecture.dot \
+    --gui \
+    --discover-workers-from-output workers \
+    --workers-key /home/sam/.ssh/vvv-sam-n550jv \
+    --workers-user ubuntu
+
+```
 
 ```
 python3 ~/projects/devops_pipeline/devops_pipeline/pipeline.py \
@@ -100,7 +143,7 @@ digraph G {
 }
 ```
 
-# commands
+# Directory structures
 
 The following is the directory structure expected by `devops-pipeline` to run the above examples
 
@@ -163,14 +206,20 @@ echo ${result} > ${EXIT_CODE_PATH}
 echo "{}" > ${OUTPUT_PATH}
 ```
 
-# Configuration syntax
+# Dot configuration syntax
 
-Each node in your architecture graph should be named `provider/component`
+* Each node in your architecture graph should be named `provider/component` where `provider` is the directory code is kept and `component` which one to deploy (see sections of Component based architecture)
+* Use directed edges in the order of creation.
+* Prefixing components with an `@` (at symbol) causes them to run locally
+* Suffixing with a `*` means that the component is only manually trigggered
+
+# How to interpret the GUI and command line outputs
 
 `terraform/webserver/run` is a reference to the `terraform` provider which is the directory of terraform code.  `webserver` is the component and `run` is a command. Commands are shell scripts in the provider directory so you can extend devops-pipeline with your own commands.
 
-
 The word after the tool name is the component name.
+
+You can provision your workers at the beginning of your pipeline by prefixing local components preceeded with an `@` (at symbol)
 
 # Managing the lifecycle of volumes, AMIs and system packages
 
