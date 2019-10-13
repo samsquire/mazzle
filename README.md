@@ -15,32 +15,15 @@ This tool executes a [dot syntax graph](https://en.wikipedia.org/wiki/DOT_(graph
 
  * provisions two CI workers with Ansible - future steps are executed on these workers
  * provisions 3 AMI builds  - base image, authenticated image and java image
- * Bastion servers
- * Prometheus with Grafana
- * Hashicorp Vault
+ * Sets up Bastion servers with Terraform
+ * Installs Prometheus and Grafana with Terraform
+ * Sets up Hashicorp Vault with Terraform
+ * Installs node_exporter on Vault, NAT instance and bastion.
+ * Sets up a Certificate authority on a Hashicorp Vault server instance with shellscript
+ * Initializes the Vault automatically and encrypts the Vault init secrets with GPG.
+ * Creates an AMI with the certificate authority certificate pre-installed.
 
 ![ui screenshot](docs/architecture.png)
-
-# component based infrastructure
-
-This tool sees infrastructure code in a certain way. Each run of a tool is a `component`. Components have names. Example components:
-
- * **ansible/provision-machines** could be a ansible role that runs configuration management
- * **packer/source-ami** could be a component that configures a base image for AWS
- * **packer/developer-box** could be a component that configures a base machine for developers
-
-This tool runs these components with the following predefined lifecycle:
-
-* **package** packaging happens first to package up the code for workers
-* **validate** runs syntax checkers
-* **run**
-* **test*
-
-To run a command, devops-pipeline runs a shellscript with he same name in the component directory. For example, `ansible/machines/run` will do this:
-
-```
-./run <environment> <component_name>
-```
 
 # traditional build ui for your software development lifecycle
 
@@ -62,6 +45,15 @@ Show a `command` with log file output.
 
 ![ui screenshot](docs/command-view.png)
 
+# component based infrastructure
+
+This tool sees infrastructure code in a certain way. Each run of a tool is a `component`. Components have names. Example components:
+
+ * **ansible/provision-machines** could be a ansible role that runs configuration management
+ * **packer/source-ami** could be a component that configures a base image for AWS
+ * **packer/developer-box** could be a component that configures a base machine for developers
+ * **shellscript/init-vault** could be shell scripts to glue together various things
+
 # performance optimisations
 
 `devops-pipeline` is meant to be ran after each and every change to your infrastructure code. You should be able to change any two parts of your infrastructure and test the changes together, simultaneously. It to be used to trigger unit testing. It uses some performance optimizations to make this possible.
@@ -74,9 +66,38 @@ This is a screenshot showing the building of components that can run in parallel
 
 ![ui screenshot](docs/parallel-components.png)
 
+# Example - An AMI Pipeline
+
+You want to use Chef to install Java and create an AWS AMI from that cookbook and then spin up an AWS instance that has Java pre-installed.
+
+![AMIPipeline](/docs/example-01.png)
+
+1. You have a Chef cookbook called ‘ubuntu-java’ that can install Java. You test with test kitchen.
+2. You have a packer template file called ‘ubuntu-java.json’.
+3. You have a terraform folder called ‘ubuntu-java’.
+
+
+architecture.dot
+```
+digraph G {
+  "chef/java" -> "packer/ubuntu-java" -> "terraform/ubuntu-java";
+}
+```
+
+# Example - Using Ansible to provision Gradle apps in the cloud
+
+The following is a pipeline of ansible, a gradle build, ansible to deploy and ansible to release the app.
+
+```
+digraph G {
+  rankdir="LR";
+  "ansible/machines" -> "gradle/app" -> "ansible/deploy" -> "ansible/release";
+}
+```
+
 # Introduction
 
-devops-pipeline is a command line tool to coordinate bringing up environments and running a chain of different devops tools.
+devops-pipeline is a command line tool with a GUI to coordinate bringing up environments and running a chain of different devops tools.
 
 * devops-pipeline coordinates other tools like Terraform, Ansible, Chef, shell scripts
 * To configure, you write a `dot` file explaining the relationships and data flow between each tool.
@@ -114,58 +135,27 @@ python3 ~/projects/devops_pipeline/devops_pipeline/pipeline.py \
 
 ```
 
-# Example - An AMI Pipeline
 
-You want to use Chef to install Java and create an AWS AMI from that cookbook and then spin up an AWS instance that has Java pre-installed.
+# command handlers
 
-![AMIPipeline](/docs/example-01.png)
+`devops-pipeline` runs commands against components in a predefined order. This is the lifecycle of commands for each component:
 
-1. You have a Chef cookbook called ‘ubuntu-java’ that can install Java. You test with test kitchen.
-2. You have a packer template file called ‘ubuntu-java.json’.
-3. You have a terraform folder called ‘ubuntu-java’.
+* **package** packaging happens first **on the master** to package code for workers
+* **validate** runs syntax checkers
+* **run** actually execute
+* **test** test for correctness
 
-
-architecture.dot
-```
-digraph G {
-  "chef/java" -> "packer/ubuntu-java" -> "terraform/ubuntu-java";
-}
-```
-
-# Example - Using Ansible to provision Gradle apps in the cloud
-
-The following is a pipeline of ansible, a gradle build, ansible to deploy and ansible to release the app.
+To run a command, `devops-pipeline` runs a shellscript with the same name in the component directory. For example, `ansible/machines/run` will do this:
 
 ```
-digraph G {
-  rankdir="LR";
-  "ansible/machines" -> "gradle/app" -> "ansible/deploy" -> "ansible/release";
-}
+./run <environment> <component_name>
 ```
 
-# Directory structures
+How command handlers handle component name is up to the command handler. In the fun-infra repository, this is what each handler does:
 
-The following is the directory structure expected by `devops-pipeline` to run the above examples
+ * **packer** uses the component_name to be the name of the json template file
+ * **ansible** uses the component_name to decide which playbook to run inside a playbooks folder (playbooks/<component_name>/<component_name>.yml)
 
-```
-ansible/playbooks
-ansible/run
-ansible/playbooks/machines
-ansible/playbooks/deploy
-ansible/playbooks/release
-gradle
-gradle/app
-gradle/run
-chef
-chef/run
-chef/java
-packer
-packer/ubuntu-java
-packer/run
-terraform/run
-terraform/ubuntu-java
-architecture.dot
-```
 
 # implementing commands such as run, test, validate
 
@@ -224,25 +214,6 @@ You can provision your workers at the beginning of your pipeline by prefixing lo
 # Managing the lifecycle of volumes, AMIs and system packages
 
 Resources such as volumes, system packages and AMIs change infrequently and remain for an extended period. We can mark these resources as manually triggered resources with a '*' symbol. While your infrastructure changes rapidly around them, these are updated less frequently.
-
-# Example - Prometheus and Vault cluster
-
-See [fun-infra repo](https://github.com/samsquire/fun-infra)
-
-![FunInfra](/docs/example-02.png)
-
-* Sets up a Prometheus instance for monitoring instances.
-* Installs node_exporter on Vault, NAT instance and bastion.
-* Sets up a Certificate authority on a Hashicorp Vault server instance.
-* Initializes the Vault automatically and encrypts the Vault init secrets.
-* Creates an AMI with the certificate authority certificate pre-installed.
-
-# Tools with examples
-
-* Chef
-* Packer
-* Terraform
-* Local shell
 
 # Usage
 
