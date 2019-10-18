@@ -45,15 +45,6 @@ Show a `command` with log file output.
 
 ![ui screenshot](docs/command-view.png)
 
-# component based infrastructure
-
-This tool sees infrastructure code in a certain way. Each run of a tool is a `component`. Components have names. Example components:
-
- * **ansible/provision-machines** could be a ansible role that runs configuration management
- * **packer/source-ami** could be a component that configures a base image for AWS
- * **packer/developer-box** could be a component that configures a base machine for developers
- * **shellscript/init-vault** could be shell scripts to glue together various things
-
 # performance optimisations
 
 `devops-pipeline` is meant to be ran after each and every change to your infrastructure code. You should be able to change any two parts of your infrastructure and test the changes together, simultaneously. It to be used to trigger unit testing. It uses some performance optimizations to make this possible.
@@ -94,6 +85,16 @@ digraph G {
   "ansible/machines" -> "gradle/app" -> "ansible/deploy" -> "ansible/release";
 }
 ```
+# component based infrastructure
+
+This tool sees infrastructure code in a certain way. Each run of a tool is a `component`. Components have names. Example components:
+
+ * **ansible/provision-machines** could be a ansible role that runs configuration management
+ * **packer/source-ami** could be a component that configures a base image for AWS
+ * **packer/developer-box** could be a component that configures a base machine for developers
+ * **shellscript/init-vault** could be shell scripts to glue together various things
+
+
 
 # Introduction
 
