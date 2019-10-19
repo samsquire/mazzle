@@ -15,8 +15,8 @@ digraph G {
    "packer/ubuntu" -> "terraform/appserver";
 }
 ```
-`packer/ubuntu` is a component that that creates Java machine images and outputs of an AMI identifier of the created AMI.
-`terraform/appserver` is a component that uses that AMI id to bring up an instance
+`packer/ubuntu` is a component that that creates machine images on AWS with Java installed and outputs an AMI identifier of the created AMI.
+`terraform/appserver` is a component that uses that AMI id it received by environment variable to bring up a new instance running that AMI
 
 
 ![](gradle-app.svg)
