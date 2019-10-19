@@ -1,10 +1,10 @@
 # introducing devops-pipeline
 
-devops-pipeline is a tool to coordinate complicated environments that are built from multiple tools.
+devops-pipeline is a tool to coordinate complicated environments that are built from multiple tools. devops-pipeline is kind of a task runner and it is modelled to appear like a continuous integration server.
 
 ## pipelines as code
 
-Write self-descriptive pipelines in dot syntax that are renderable by graphviz and executable by this tool.
+Write self-descriptive pipelines in dot syntax that are renderable by graphviz and executable by this tool. We model data flow in our pipelines.
 
 ![](java-server.svg)
 
@@ -14,6 +14,9 @@ digraph G {
    "packer/ubuntu" -> "terraform/appserver";
 }
 ```
+`packer/ubuntu` is a component that that creates Java machine images and outputs of an AMI identifier of the created AMI.
+`terraform/appserver` is a component that uses that AMI id to bring up an instance
+
 
 ![](gradle-app.svg)
 
@@ -23,6 +26,8 @@ digraph G {
   "ansible/machines" -> "gradle/app" -> "ansible/deploy" -> "ansible/release";
 }
 ```
+`ansible/machines` is a component that provisions machines running java.
+`gradle/app` is a component that builds from source a Java app.
 
 # introduction
 
@@ -30,17 +35,32 @@ digraph G {
 
 # parallel execution
 
-`devops-pipeline` knows what parts of your environment infrastructure can run together in paralell (concurrently and in parallel) due to the graphs defining 
+`devops-pipeline` knows what parts of your environment infrastructure can run together in paralell (concurrently and in parallel) due to the graphs defining data flow.
 
 ![pipeline-running](parallel-components.png)
 
+# SSH workers
+
+You don't always want to run builds on the master node (where you run devops-pipeline from) You can specify a list of hosts to run builds on remote servers.
+
+```
+devops-pipeline --gui \
+    --workers node1 node2 \
+    --workers-key ~/secrets/worker-ssh-key
+```
+
+An idiom in `devops-pipeline` is that your very first stage in your pipeline is to provision worker nodes.
+
+![](worker-provisioning.svg)
+
+```
+digraph G {
+	rankdir="LR";
+	"@ansible/machines" -> "@ansible/provision-workers"-> "packer/source-ami" -> "terraform/appservers";
+}
+```
+
 The tools you use to bring up or change an environment are ran and configured in a certain ordering. In devops-pipeline, the ordering and dependencies between tools are explicitly configured in a **graph file**. devops-pipeline uses Graphviz dot file syntax for its configuration.
-
-devops-pipeline is kind of a task runner and it is modelled to appear like a continuous integration server.
-
-
-
-devops-pipeline is meant to be simple.
 
 
 
