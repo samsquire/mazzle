@@ -47,10 +47,10 @@ Show a `command` with log file output.
 
 # performance optimisations
 
-`devops-pipeline` is meant to be ran after each and every change to your infrastructure code. You should be able to change any two parts of your infrastructure and test the changes together, simultaneously. It to be used to trigger unit testing. It uses some performance optimizations to make this possible.
+`devops-pipeline` is meant to be ran after each and every change to your infrastructure code. You should be able to change any two parts of your infrastructure - at any layer - and test those changes together. It is meant to be used to trigger unit testing of all parts of your pipeline impacted by your changes. If you make a change early in your pipeline, you should be able to trigger tests underneath that point onwards to see if you have broken any thing. devops-pipeline uses some performance optimizations to be cheap to run:
 
  * It calculates and runs in parallel what parts of your environment are safe to run at the same time where there are no data dependencies.
- * It detects if infrastructure code has been changed and whether or not it needs to be reran.
+ * It detects if infrastructure directories has been changed and whether or not it needs to be reran.
  * It can run builds on SSH workers. You can use local builds to create and provision workers.
 
 This is a screenshot showing the building of components that can run in parallel without impacting one another.
