@@ -4,7 +4,7 @@ devops-pipeline is a tool to coordinate complicated environments that are built 
 
 ## pipelines as code
 
-Write self-descriptive pipelines in dot syntax that are renderable by graphviz and executable by this tool. We model data flow in our pipelines.
+Write self-descriptive pipelines in dot syntax that are renderable by graphviz and executable by this tool. devops-pipeline uses Graphviz dot file syntax for its configuration and we model data flow through pipelines.
 
 ![](java-server.svg)
 
@@ -68,13 +68,17 @@ digraph G {
 }
 ```
 
-The tools you use to bring up or change an environment are ran and configured in a certain ordering. In devops-pipeline, the ordering and dependencies between tools are explicitly configured in a **graph file**. devops-pipeline uses Graphviz dot file syntax for its configuration.
+## idiom - building development workstations
+
+![](devbox.svg)
+
+```
+digraph G {
+	"@vagrant/devbox" -> "@ansible/workers" -> "@ansible/workers-provision";
+}
+```
 
 
-
-By specifying what comes before what, devops-pipeline can ensure it runs your tools in the correct order.
-
-# why devops-pipeline
 
 * Environments are complicated
 * Knowledge of how bring up a new environment is not machine readable
