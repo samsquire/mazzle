@@ -108,6 +108,10 @@ devops-pipeline is a command line tool with a GUI to coordinate bringing up envi
 * Environment variables are how data is shared between tools.
 * devops-pipeline is meant to be cheap to run; you run it after making a change. It works out what needs to rerun.
 
+# Installation
+
+ **Todo**
+
 # Worker support
 
 devops-pipeline can trigger builds on remote instances with SSH.
