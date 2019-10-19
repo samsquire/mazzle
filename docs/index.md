@@ -78,7 +78,11 @@ digraph G {
 }
 ```
 
+# Quickstart
 
+
+
+# why devops-pipeline
 
 * Environments are complicated
 * Knowledge of how bring up a new environment is not machine readable
