@@ -49,9 +49,13 @@ devops-pipeline --gui \
     --workers-key ~/secrets/worker-ssh-key
 ```
 
-An idiom in `devops-pipeline` is that your very first stage in your pipeline is to provision worker nodes.
+## idiom - provision workers to begin with
+
+An idiom in `devops-pipeline` is that your very first stage in your pipeline is to provision worker nodes. These are the servers that run the remainder of the build.
 
 ![](worker-provisioning.svg)
+
+The at symbol `@` at the beginning of a component reference means that this component builds on the master node.
 
 ```
 digraph G {
