@@ -36,7 +36,7 @@ digraph G {
 
 # parallel execution
 
-`devops-pipeline` knows what parts of your environment infrastructure can run together in paralell (concurrently and in parallel) due to the graphs defining data flow.
+`devops-pipeline` knows what parts of your environment infrastructure can run together in concurrently and in parallel due to the graphs defining data flow.
 
 ![pipeline-running](parallel-components.png)
 
