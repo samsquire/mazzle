@@ -15,7 +15,6 @@ def parallelise_components(component_data):
     for component in component_data:
         suffix = component["name"]
         start_var = model.NewIntVar(0, horizon, 'start/' + suffix)
-        group_var = model.NewIntVar(0, 100, 'group/' + suffix)
         component_vars[suffix] = task_run(start_var, group_var)
 
     parallel_group = collections.defaultdict(list)
@@ -25,7 +24,6 @@ def parallelise_components(component_data):
 
         for ancestor in component["ancestors"]:
             model.Add(component_vars[ancestor].start < this_var.start)
-            # model.Add(component_vars[ancestor].group == this_var.group)
         for successor in component["successors"]:
             model.Add(component_vars[successor].start > this_var.start)
         successor_lookup[component["name"]] = component["successors"]
