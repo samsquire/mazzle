@@ -85,6 +85,27 @@ digraph G {
   "ansible/machines" -> "gradle/app" -> "ansible/deploy" -> "ansible/release";
 }
 ```
+# Managing the lifecycle of volumes, AMIs and system packages
+
+Resources such as volumes, system packages and AMIs change infrequently and remain for an extended period. We can mark these resources as manually triggered resources with a '*' symbol. While your infrastructure changes rapidly around them, these are updated less frequently.
+
+The following pipeline is an example how to separate the lifecycle of things that change infrequently from things that change frequently. In this case, a volume for a server should be reran only when manually triggered.
+
+```
+digraph G {
+ "terraform/repository-volume*" -> "terraform/repository";
+}
+```
+
+Using fpm to package up nodejs, uploading it to a package repository and installing the package on VMs with ansible:
+
+```
+digraph G {
+  "fpm/node" -> "shellscript/upload" -> "ansible/install"
+}
+```
+
+
 # component based infrastructure
 
 This tool sees infrastructure code in a certain way. Each run of a tool is a `component`. Components have names. Example components:
@@ -215,10 +236,6 @@ echo "{}" > ${OUTPUT_PATH}
 The word after the tool name is the component name.
 
 You can provision your workers at the beginning of your pipeline by prefixing local components preceeded with an `@` (at symbol)
-
-# Managing the lifecycle of volumes, AMIs and system packages
-
-Resources such as volumes, system packages and AMIs change infrequently and remain for an extended period. We can mark these resources as manually triggered resources with a '*' symbol. While your infrastructure changes rapidly around them, these are updated less frequently.
 
 # Usage
 
