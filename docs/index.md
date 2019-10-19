@@ -8,6 +8,7 @@ Write self-descriptive pipelines in dot syntax that are renderable by graphviz a
 
 ![](java-server.svg)
 
+file: architecture.dot
 ```
 digraph G {
    rankdir="LR";
@@ -19,7 +20,7 @@ digraph G {
 
 
 ![](gradle-app.svg)
-
+file: architecture.dot
 ```
 digraph G {
   rankdir="LR";
@@ -44,14 +45,17 @@ digraph G {
 You don't always want to run builds on the master node (where you run devops-pipeline from) You can specify a list of hosts to run builds on remote servers.
 
 ```
-devops-pipeline --gui \
+devops-pipeline --file architecture.dot \
+    --gui \
     --workers node1 node2 \
     --workers-key ~/secrets/worker-ssh-key
 ```
 
 ## idiom - provision workers to begin with
 
-An idiom in `devops-pipeline` is that your very first stage in your pipeline is to provision worker nodes. These are the servers that run the remainder of the build.
+An idiom in `devops-pipeline` is that your early stages in your pipeline is provisioning worker nodes. These worker nodes run the remainder of the build. You can replace `--workers` with `--discover-workers-from-output <output name>` where `output name` is the name of an ouput from your machine provisioning component that contains a list of server hostnames or IP addresses that you can SSH onto.
+
+Here is an example of ansible provisioning EC2 instances and installing dependencies on worker nodes, then running packer to build an AMI and launching that AMI with terraform.
 
 ![](worker-provisioning.svg)
 
