@@ -4,6 +4,8 @@ devops-pipeline is a tool to coordinate complicated environments that are built 
 
 ## pipelines as code
 
+Write self-descriptive pipelines in dot syntax that are renderable by graphviz and executable by this tool.
+
 ![](java-server.svg)
 
 ```
@@ -24,9 +26,11 @@ digraph G {
 
 # introduction
 
-`devops-pipeline` is for environments like this: AWS, Terraform, Packer, shell scripts, Ansible, docker, Chef. devops-pipeline allows you to chain together tools for running on your developer workstation. devops-pipeline models the flow of data between tools and uses environment variables to pass data around. devops-pipeline is meant to be used regularly while you are building complex environments.
+`devops-pipeline` is for deterministically creating computer environments. An example environment is one that uses AWS, Terraform, Packer, shell scripts, Ansible, docker, Chef. `devops-pipeline` allows you to chain together tools for running on your developer workstation. devops-pipeline models the flow of data between tools and uses environment variables to pass along data. devops-pipeline is meant to be used after each change whereby it runs validations, unit tests, smoke tests and deployments tests.
 
-# features
+# parallel execution
+
+`devops-pipeline` knows what parts of your environment infrastructure can run together in paralell (concurrently and in parallel) due to the graphs defining 
 
 ![pipeline-running](parallel-components.png)
 
