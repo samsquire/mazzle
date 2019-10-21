@@ -53,7 +53,8 @@ You don't always want to run builds on the master node (where you run devops-pip
 devops-pipeline --file architecture.dot \
     --gui \
     --workers node1 node2 \
-    --workers-key ~/secrets/worker-ssh-key
+    --workers-key ~/.ssh/worker-ssh-key \
+    --workers-user ubuntu
 ```
 
 ## idiom - provision workers at the beginning of your pipeline
