@@ -6,6 +6,7 @@ devops-pipeline is a tool to coordinate complicated environments that are built 
 
 Write self-descriptive pipelines in dot syntax that are renderable by graphviz and executable by this tool. devops-pipeline uses Graphviz dot file syntax for its configuration and we model data flow through pipelines.
 
+### Example - building an AMI
 ![](java-server.svg)
 
 file: architecture.dot
@@ -18,7 +19,7 @@ digraph G {
 `packer/ubuntu` is a component that that creates machine images on AWS with Java installed and outputs an AMI identifier of the created AMI.
 `terraform/appserver` is a component that uses that AMI id it received by environment variable to bring up a new instance running that AMI
 
-
+## Example - building a Java app
 ![](gradle-app.svg)
 file: architecture.dot
 ```
@@ -51,7 +52,7 @@ devops-pipeline --file architecture.dot \
     --workers-key ~/secrets/worker-ssh-key
 ```
 
-## idiom - provision workers to begin with
+## idiom - provision workers at the beginning of your pipeline
 
 An idiom in `devops-pipeline` is that your early stages in your pipeline is provisioning worker nodes. These worker nodes run the remainder of the build. You can replace `--workers` with `--discover-workers-from-output <output name>` where `output name` is the name of an ouput from your machine provisioning component that contains a list of server hostnames or IP addresses that you can SSH onto.
 
