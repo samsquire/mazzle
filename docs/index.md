@@ -1,5 +1,7 @@
 # introducing devops-pipeline
 
+This is a prototype. YMMV
+
 devops-pipeline is a tool to coordinate complicated environments that are built from multiple tools. devops-pipeline is kind of a task runner and it is modelled to appear like a continuous integration server.
 
 ## pipelines as code
