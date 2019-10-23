@@ -4,6 +4,11 @@ This is a prototype. YMMV
 
 devops-pipeline is a command line tool to coordinate large complicated environments that are built from multiple devops tools. devops-pipeline is kind of a task runner and its web GUI is modelled to appear like a continuous integration server.
 
+## infrastructure as code and pipelines as code
+
+Write self-descriptive pipelines in dot syntax renderable by graphviz and executable by this tool. devops-pipeline uses [Graphviz dot file syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) for its configuration. In devops-pipeline, you **specify the order of pipeline execution and flow of data between components**.
+
+
 # parallel build execution
 
 `devops-pipeline` knows what parts of your environment infrastructure can run together concurrently and in parallel due to its configuration being a graph file.
@@ -15,10 +20,6 @@ devops-pipeline is a command line tool to coordinate large complicated environme
  * **Simple GUI** You can use the GUI to trigger builds
  * **Fast builds** devops-pipeline only runs parts of your pipeline that need to run by detecting if they have been changed since the last run.
  * **Parallelisation of devops tools** devops-pipeline knows what part of your infrastructure can run simultaneously, in parallel.
-
-## infrastructure as code and pipelines as code
-
-Write self-descriptive pipelines in dot syntax renderable by graphviz and executable by this tool. devops-pipeline uses [Graphviz dot file syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) for its configuration. In devops-pipeline, you **specify the order of pipeline execution and flow of data between components**.
 
 ### Example - building and using an AMI
 
