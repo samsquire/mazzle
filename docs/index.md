@@ -6,14 +6,14 @@ devops-pipeline is a command line tool to coordinate large complicated environme
 
 # parallel build execution
 
-`devops-pipeline` knows what parts of your environment infrastructure can run together concurrently and in parallel due to the graphs defining data flow.
+`devops-pipeline` knows what parts of your environment infrastructure can run together concurrently and in parallel due to its configuration being a graph file.
 
 ![pipeline-running](parallel-components.png)
 
 ## features
 
  * **Simple GUI** You can use the GUI to trigger builds
- * **Change detection** - only run slow tools if they need to be ran
+ * **Fast builds** devops-pipeline only runs parts of your pipeline that need to run by detecting if they have been changed since the last run.
  * **Parallelisation of devops tools** devops-pipeline knows what part of your infrastructure can run simultaneously, in parallel.
 
 ## infrastructure as code and pipelines as code
@@ -97,8 +97,6 @@ devops-pipeline uses the `component-paths` script to detect if a component has c
 ```
 
 The above command should return all the files for running component
-
-
 
 # SSH workers
 
