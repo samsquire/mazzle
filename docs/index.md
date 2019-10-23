@@ -4,6 +4,12 @@ This is a prototype. YMMV
 
 devops-pipeline is a command line tool to coordinate large complicated environments that are built from multiple devops tools. devops-pipeline is kind of a task runner and its web GUI is modelled to appear like a continuous integration server.
 
+## features
+
+ * Change detection - only run slow tools if they need to be ran
+ * Simple GUI
+ * Parallelisation of components
+
 ## infrastructure as code and pipelines as code
 
 Write self-descriptive pipelines in dot syntax renderable by graphviz and executable by this tool. devops-pipeline uses [Graphviz dot file syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) for its configuration. In devops-pipeline, you **specify the order of pipeline execution and flow of data between components**.
@@ -37,6 +43,14 @@ digraph G {
 `ansible/machines` is a component that provisions machines running java.
 `gradle/app` is a component that builds from source a Java app. One of `gradle/app`'s outputs is a path to an artifact; a set of jar files.
 
+# introduction
+
+`devops-pipeline` is for deterministically creating computer environments. An example environment is one that could use AWS, Terraform, Packer, shell scripts, Ansible, docker, Chef. `devops-pipeline` allows you to chain together tools for running on your developer workstation. devops-pipeline models the flow of data between tools and uses environment variables to pass along data. devops-pipeline is meant to be used after each change whereby it runs validations, unit tests, smoke tests and deployments tests.
+
+# quickstart
+
+TODO
+
 # how it works and adding new tools to devops-pipeline
 
 To understand how devops-pipeline works, you need to understand the directory structure. **Your code is separated by directory by each tool**. Like a **monorepository**, you divide your code by tool, so you have a directory for ansible code, a directory for terraform code. Devops-pipeline walks your pipeline and runs shellscripts inside each directory to activate each tool.
@@ -53,13 +67,20 @@ chef/
 
 # Lifecycle Commands
 
-Devops-pipeline runs lifecycle commands inside provider directories. It first switches to these directories and runs a lifecycle command. Some lifecycle commands will be familiar, such as:
+Devops-pipeline runs lifecycle commands inside provider directories. It runs a lifecycle commands within the provider directory. Some lifecycle commands will be familiar, such as:
 
  * **validate**
  * **test**
  * **run**
 
 Supporting additional tools in devops-pipeline is simple. You need to provide at the very least, a `run` script for that tool. You place this inside the provider directory. So, to introducea new devops tool **xyz**, you would create an **xyz** directory and introduce a **run** script in the **xyz** directory **xyz/run**.
+
+## run
+
+Run needs to handle following environment variables:
+
+* EXIT_CODE_PATH
+* OUTPUT_PATH
 
 ## Internal lifecycle command: component-paths
 
@@ -71,13 +92,6 @@ devops-pipeline uses the `component-paths` script to detect if a component has c
 
 The above command should return all the files for running component
 
-# introduction
-
-`devops-pipeline` is for deterministically creating computer environments. An example environment is one that could use AWS, Terraform, Packer, shell scripts, Ansible, docker, Chef. `devops-pipeline` allows you to chain together tools for running on your developer workstation. devops-pipeline models the flow of data between tools and uses environment variables to pass along data. devops-pipeline is meant to be used after each change whereby it runs validations, unit tests, smoke tests and deployments tests.
-
-# quickstart
-
-TODO
 
 # parallel execution
 
