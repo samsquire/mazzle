@@ -11,7 +11,9 @@ Write self-descriptive pipelines in dot syntax renderable by graphviz and execut
 
 # parallel build execution
 
-`devops-pipeline` knows what parts of your environment infrastructure can run together concurrently and in parallel due to its configuration being a graph file.
+`devops-pipeline` knows what parts of your environment infrastructure can run together concurrently and in parallel due to its configuration being a graph file. Here is an example graph and GUI screenshot.
+
+![architecture](architecture.png)
 
 ![pipeline-running](parallel-components.png)
 
