@@ -2,11 +2,11 @@
 
 This is a prototype. YMMV
 
-devops-pipeline is a tool to coordinate large complicated environments that are built from multiple devops tools. devops-pipeline is kind of a task runner and its GUI is modelled to appear like a continuous integration server.
+devops-pipeline is a command line tool to coordinate large complicated environments that are built from multiple devops tools. devops-pipeline is kind of a task runner and its web GUI is modelled to appear like a continuous integration server.
 
 ## infrastructure as code and pipelines as code
 
-Write self-descriptive pipelines in dot syntax renderable by graphviz and executable by this tool. devops-pipeline uses [Graphviz dot file syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) for its configuration. In devops-pipeline, you **model the order of pipeline execution and flow of data between components**.
+Write self-descriptive pipelines in dot syntax renderable by graphviz and executable by this tool. devops-pipeline uses [Graphviz dot file syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) for its configuration. In devops-pipeline, you **specify the order of pipeline execution and flow of data between components**.
 
 ### Example - building and using an AMI
 
@@ -63,9 +63,9 @@ devops-pipeline --file architecture.dot \
     --workers-user ubuntu
 ```
 
-## idiom - provision workers at the beginning of your pipeline
+## idiom - provision SSH workers at the beginning of your pipeline
 
-An idiom in `devops-pipeline` is that your early stages in your pipeline is provisioning worker nodes. These worker nodes run the remainder of the build. You can replace `--workers` with `--discover-workers-from-output <output name>` where `output name` is the name of an ouput from your machine provisioning component that contains a list of server hostnames or IP addresses that you can SSH onto.
+Unlike Jenkins and gocd, worker nodes are considered to be part of your pipeline. An idiom in `devops-pipeline` is that your early stages in your pipeline is provisioning worker nodes. These worker nodes run the remainder of the build. You can replace `--workers` with `--discover-workers-from-output <output name>` where `output name` is the name of an ouput from your machine provisioning component that contains a list of server hostnames or IP addresses that you can SSH onto.
 
 Here is an example of ansible provisioning EC2 instances and installing dependencies on worker nodes, then running packer to build an AMI and launching that AMI with terraform.
 
@@ -82,7 +82,7 @@ digraph G {
 
 ## idiom - building development workstations
 
-Another idiom is that developer workstations are provisioned by **devops-pipeline** which are your workstations you use for development.
+An idiom is that developer workstations are provisioned by **devops-pipeline** which are your workstations you use for development.
 
 ![](devbox.svg)
 
@@ -95,6 +95,27 @@ digraph G {
 # Quickstart
 
 
+# How devops-pipeline works
+
+To understand how devops-pipeline works, you need to understand the directory structure. Your directory structure is that each provider has its own directory. Commands are scripts inside this directory. Commands are shellscripts called like this:
+
+```
+./run <environment> <component>
+```
+
+```
+provider
+provider/command
+```
+
+For example:
+
+```
+ansible
+ansible/run
+```
+
+Supporting additional tools in devops-pipeline is simple. You need to provide at the very least, a `run` script for that tool. You place this inside the provider directory.
 
 # why devops-pipeline
 
