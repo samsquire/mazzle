@@ -2,13 +2,13 @@
 
 This is a prototype. YMMV
 
-devops-pipeline is a tool to coordinate complicated environments that are built from multiple tools. devops-pipeline is kind of a task runner and its GUI is modelled to appear like a continuous integration server.
+devops-pipeline is a tool to coordinate large complicated environments that are built from multiple devops tools. devops-pipeline is kind of a task runner and its GUI is modelled to appear like a continuous integration server.
 
 ## infrastructure as code and pipelines as code
 
-Write self-descriptive pipelines in dot syntax that are renderable by graphviz and executable by this tool. devops-pipeline uses [Graphviz dot file syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) for its configuration. In devops-pipeline, you **model the order of pipeline execution and data flow**.
+Write self-descriptive pipelines in dot syntax renderable by graphviz and executable by this tool. devops-pipeline uses [Graphviz dot file syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) for its configuration. In devops-pipeline, you **model the order of pipeline execution and flow of data between components**.
 
-### Example - building an AMI
+### Example - building and using an AMI
 
 ![](java-server.svg)
 
@@ -19,9 +19,11 @@ digraph G {
    "packer/ubuntu" -> "terraform/appserver";
 }
 ```
-In this pipeline `packer/ubuntu` is a `component` that that creates machine images on AWS with Java installed. **packer/ubuntu outputs an AMI ID.** `terraform/appserver` is another component that needs this AMI ID to bring up a new instance running that AMI.
 
-## Example - building a Java app
+In the above pipeline `packer/ubuntu` is a `component` that that uses packer to create machine images on AWS with Java installed. **packer/ubuntu outputs an AMI ID.** `terraform/appserver` is another component that needs this AMI ID to bring up a new instance running that AMI.
+
+## Example - building and releasing a Java app
+
 ![](gradle-app.svg)
 
 file: architecture.dot
@@ -33,11 +35,11 @@ digraph G {
 }
 ```
 `ansible/machines` is a component that provisions machines running java.
-`gradle/app` is a component that builds from source a Java app.
+`gradle/app` is a component that builds from source a Java app. One of `gradle/app`'s outputs is a path to an artifact; a set of jar files.
 
 # introduction
 
-`devops-pipeline` is for deterministically creating computer environments. An example environment is one that uses AWS, Terraform, Packer, shell scripts, Ansible, docker, Chef. `devops-pipeline` allows you to chain together tools for running on your developer workstation. devops-pipeline models the flow of data between tools and uses environment variables to pass along data. devops-pipeline is meant to be used after each change whereby it runs validations, unit tests, smoke tests and deployments tests.
+`devops-pipeline` is for deterministically creating computer environments. An example environment is one that could use AWS, Terraform, Packer, shell scripts, Ansible, docker, Chef. `devops-pipeline` allows you to chain together tools for running on your developer workstation. devops-pipeline models the flow of data between tools and uses environment variables to pass along data. devops-pipeline is meant to be used after each change whereby it runs validations, unit tests, smoke tests and deployments tests.
 
 # quickstart
 
@@ -45,13 +47,13 @@ TODO
 
 # parallel execution
 
-`devops-pipeline` knows what parts of your environment infrastructure can run together in concurrently and in parallel due to the graphs defining data flow.
+`devops-pipeline` knows what parts of your environment infrastructure can run together concurrently and in parallel due to the graphs defining data flow.
 
 ![pipeline-running](parallel-components.png)
 
 # SSH workers
 
-You don't always want to run builds on the master node (where you run devops-pipeline from) You can specify a list of hosts to run builds on remote servers.
+You don't always want to run builds on the master node (where you run devops-pipeline from) You can specify a list of hosts to run builds on remote servers **via SSH**.
 
 ```
 devops-pipeline --file architecture.dot \
@@ -79,6 +81,8 @@ digraph G {
 ```
 
 ## idiom - building development workstations
+
+Another idiom is that developer workstations are provisioned by **devops-pipeline** which are your workstations you use for development.
 
 ![](devbox.svg)
 
