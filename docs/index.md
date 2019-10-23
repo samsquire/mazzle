@@ -61,9 +61,15 @@ Devops-pipeline runs lifecycle commands inside provider directories. It first sw
 
 Supporting additional tools in devops-pipeline is simple. You need to provide at the very least, a `run` script for that tool. You place this inside the provider directory. So, to introducea new devops tool **xyz**, you would create an **xyz** directory and introduce a **run** script in the **xyz** directory **xyz/run**.
 
-## Internal lifecycle command: component-files
+## Internal lifecycle command: component-paths
 
+devops-pipeline uses the `component-paths` script to detect if a component has changed. This script should return all files linked to the component.
 
+```
+./ansible/component-paths <environment> <component>
+```
+
+The above command should return all the files for running component
 
 # introduction
 
