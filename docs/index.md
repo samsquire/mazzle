@@ -37,6 +37,34 @@ digraph G {
 `ansible/machines` is a component that provisions machines running java.
 `gradle/app` is a component that builds from source a Java app. One of `gradle/app`'s outputs is a path to an artifact; a set of jar files.
 
+# how it works and adding new tools to devops-pipeline
+
+To understand how devops-pipeline works, you need to understand the directory structure. **Your code is separated by directory by each tool**. Like a **monorepository**, you divide your code by tool, so you have a directory for ansible code, a directory for terraform code. Devops-pipeline walks your pipeline and runs shellscripts inside each directory to activate each tool.
+
+For example:
+
+```
+ansible/
+shellscript/
+terraform/
+packer/
+chef/
+```
+
+# Lifecycle Commands
+
+Devops-pipeline runs lifecycle commands inside provider directories. It first switches to these directories and runs a lifecycle command. Some lifecycle commands will be familiar, such as:
+
+ * **validate**
+ * **test**
+ * **run**
+
+Supporting additional tools in devops-pipeline is simple. You need to provide at the very least, a `run` script for that tool. You place this inside the provider directory. So, to introducea new devops tool **xyz**, you would create an **xyz** directory and introduce a **run** script in the **xyz** directory **xyz/run**.
+
+## Internal lifecycle command: component-files
+
+
+
 # introduction
 
 `devops-pipeline` is for deterministically creating computer environments. An example environment is one that could use AWS, Terraform, Packer, shell scripts, Ansible, docker, Chef. `devops-pipeline` allows you to chain together tools for running on your developer workstation. devops-pipeline models the flow of data between tools and uses environment variables to pass along data. devops-pipeline is meant to be used after each change whereby it runs validations, unit tests, smoke tests and deployments tests.
@@ -94,28 +122,6 @@ digraph G {
 
 # Quickstart
 
-
-# How devops-pipeline works
-
-To understand how devops-pipeline works, you need to understand the directory structure. Your directory structure is that each provider has its own directory. Commands are scripts inside this directory. Commands are shellscripts called like this:
-
-```
-./run <environment> <component>
-```
-
-```
-provider
-provider/command
-```
-
-For example:
-
-```
-ansible
-ansible/run
-```
-
-Supporting additional tools in devops-pipeline is simple. You need to provide at the very least, a `run` script for that tool. You place this inside the provider directory.
 
 # why devops-pipeline
 
