@@ -2,13 +2,14 @@
 
 This is a prototype. YMMV
 
-devops-pipeline is a tool to coordinate complicated environments that are built from multiple tools. devops-pipeline is kind of a task runner and it is modelled to appear like a continuous integration server.
+devops-pipeline is a tool to coordinate complicated environments that are built from multiple tools. devops-pipeline is kind of a task runner and its GUI is modelled to appear like a continuous integration server.
 
-## pipelines as code
+## infrastructure as code and pipelines as code
 
-Write self-descriptive pipelines in dot syntax that are renderable by graphviz and executable by this tool. devops-pipeline uses Graphviz dot file syntax for its configuration and we model data flow through pipelines.
+Write self-descriptive pipelines in dot syntax that are renderable by graphviz and executable by this tool. devops-pipeline uses [Graphviz dot file syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) for its configuration. In devops-pipeline, you **model the order of pipeline execution and data flow**.
 
 ### Example - building an AMI
+
 ![](java-server.svg)
 
 file: architecture.dot
@@ -18,12 +19,13 @@ digraph G {
    "packer/ubuntu" -> "terraform/appserver";
 }
 ```
-`packer/ubuntu` is a component that that creates machine images on AWS with Java installed and outputs an AMI identifier of the created AMI.
-`terraform/appserver` is a component that uses that AMI id it received by environment variable to bring up a new instance running that AMI
+In this pipeline `packer/ubuntu` is a `component` that that creates machine images on AWS with Java installed. **packer/ubuntu outputs an AMI ID.** `terraform/appserver` is another component that needs this AMI ID to bring up a new instance running that AMI.
 
 ## Example - building a Java app
 ![](gradle-app.svg)
+
 file: architecture.dot
+
 ```
 digraph G {
   rankdir="LR";
