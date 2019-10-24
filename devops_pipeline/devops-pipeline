@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from threading import Thread, Lock
 from functools import reduce
+import itertools
 import collections
 
 from functools import partial
@@ -111,6 +112,7 @@ def get_builds(environment, provider, component, command):
     builds_file = get_builds_filename(environment, provider, component, command)
     ensure_file(builds_file)
     opened = open(builds_file)
+
     build_data = json.loads(opened.read())
     opened.close()
     builds = build_data["builds"]
@@ -133,12 +135,13 @@ def get_outputs_filename(environment, provider, component, command):
     return os.path.abspath(os.path.join(project_directory, "builds/outputs/{}.{}.{}.{}.outputs.json".format(environment, provider, component, command)))
 
 class Component():
-    def __init__(self, reference, environment, provider, component, command):
+    def __init__(self, reference, environment, provider, component, command, args):
         self.environment = environment
         self.provider = provider
         self.component = component
         self.command = command
         self.reference = reference
+        self.args = args
 
     def handle_success(self, build):
         environment = self.environment
@@ -157,7 +160,7 @@ class Component():
         pretty_build_number = "{:0>4d}".format(build_number)
         if 'secrets' in decoded:
           secrets = decoded.pop('secrets')
-          recipient_list = list(map(lambda key: ["--recipient", key], args.keys))
+          recipient_list = list(map(lambda key: ["--recipient", key], self.args.keys))
           encrypt_command = ["gpg"] + list(itertools.chain(*recipient_list)) + ["--encrypt"]
           print(encrypt_command)
           encrypter = Popen(encrypt_command, stdin=PIPE, stdout=PIPE, stderr=sys.stderr)
@@ -180,13 +183,14 @@ class Component():
 
         print("{} {} Build passed".format(dependency, pretty_build_number))
         # run(["git", "tag", "-d", "pipeline/pending/{}/{}/{}/{}".format(environment, provider, component, pretty_build_number)], stdout=PIPE)
-        run(["git", "tag", "pipeline/{}/{}/{}/{}".format(environment, provider, component, pretty_build_number)], stdout=PIPE)
+        # run(["git", "tag", "pipeline/{}/{}/{}/{}".format(environment, provider, component, pretty_build_number)], stdout=PIPE)
 
         last_run_path = get_last_run_path(environment, provider, component, command)
         open(os.path.join(last_run_path), 'w').write(':)')
 
     def calculate_state(self):
         builds, last_build_status, next_build = get_builds(self.environment, self.provider, self.component, self.command)
+        last_running_build = None
         for build in builds:
             build_number = build["build_number"]
             exit_code_path = os.path.abspath(get_exit_code_path(project_directory, self.environment, self.provider, self.component, self.command, build_number))
@@ -196,7 +200,8 @@ class Component():
                     build["status"] = "failure"
 
             if os.path.isfile(exit_code_path) and build.get('status') == "running":
-                print("Build is running but has exit code set")
+                print("Build is running and has exit code set")
+                last_running_build = build
                 build["status"] = "finished"
                 exit_code_data = open(exit_code_path).read()
                 exit_code = int(exit_code_data)
@@ -212,6 +217,7 @@ class Component():
                         build["success"] = False
                         build["status"] = "unknown"
                 else:
+                    print("Build failure")
                     build["success"] = False
             if "pid" not in build and build["status"] == "running":
                 build["status"] = "unknown"
@@ -220,6 +226,7 @@ class Component():
         remove_from_running(self.reference)
         builds_filename = get_builds_filename(self.environment, self.provider, self.component, self.command)
         write_builds_file(builds_filename, {"builds": builds})
+        return last_running_build
 
 
 def main():
@@ -272,18 +279,26 @@ def main():
             self.index = index
             self.environment = environment
             self.pattern = pattern
+            self.error = False
+            self.success = False
 
         def run(self):
             for thread in self.component["ancestors"]:
                 if thread in self.threads:
                     self.threads[thread].join()
+                    if not self.threads[thread].success:
+                        print("Aborting due to upstream error")
+                        return
 
             if matcher(self.item, self.pattern):
                 print("Running {}".format(self.item))
                 handle = do_work(self.environment, self.index, self.item)
+
                 if handle:
                     handle.join()
-
+                    self.success = handle.success
+                else:
+                    self.success = True
 
 
     class Grouper(Thread):
@@ -365,7 +380,7 @@ def main():
                 if os.path.isfile(last_run_path):
                     find_command = ["find"] + component_paths + ["(", "-path", "*.state", "-o", "-path",
                     "*.terraform", ")", "-prune", "-o", "-newer", os.path.abspath(last_run_path), "-print"]
-                    print(" ".join(find_command))
+                    # print(" ".join(find_command))
                     changed_files = run(find_command,
                         cwd=os.path.join(project_directory, provider),
                         stdout=PIPE).stdout.decode('utf-8').split("\n")
@@ -436,17 +451,24 @@ def main():
 
                  if hosts and args.force_local == False and local == False:
                      print("Connecting to remote worker")
+                     accept_keys_command = Popen(["bash", "-c", "ssh-keyscan -H {}".format(hosts)], stdout=PIPE, stderr=PIPE) # " >> ~/.ssh/known_hosts".format(hosts)])
+                     keyout, keyerr = accept_keys_command.communicate()
+                     keyout_data = keyout.decode('utf8')
+                     known_hosts_file = open("/home/{}/.ssh/known_hosts".format(os.environ["USER"])).read()
+                     if keyout_data not in known_hosts_file:
+                         Popen(["bash", "-c", "echo \"{}\" >> ~/.ssh/known_hosts".format(keyout_data)])
+
                      client = ParallelSSHClient([hosts], user=args.workers_user, pkey=args.workers_key[worker_index % len(args.workers_key)])
                      artifact_test = client.run_command("test -f {}".format(last_artifact_name))
                      client.join(artifact_test)
                      if artifact_test[hosts]["exit_code"] != 0:
                          print("Uploading {} to workers...".format(source_artifact))
-                         cmds = client.copy_file(source_artifact, last_artifact_name)
+                         cmds = client.scp_send(source_artifact, last_artifact_name)
                          joinall(cmds, raise_error=True)
 
 
              if args.force_local == False and local == False and client != None:
-                 print("Running SSH build")
+                 print("Running SSH build of {}".format(item))
                  handle = run_worker_build(client,
                     hosts, last_artifact_name,
                     next_build,
@@ -741,6 +763,7 @@ def main():
         builds):
         class Worker(Thread):
             def run(self):
+                self.success = False
                 exit_code_path = get_exit_code_path(project_directory, environment, provider, component, command, build_number)
                 if os.path.exists(exit_code_path):
                     os.remove(exit_code_path)
@@ -799,7 +822,10 @@ def main():
                 env_file_path = os.path.join(project_directory, "builds/envs/", env_file_name)
                 env_file = open(env_file_path, "w")
                 for key, value in env.items():
-                    env_file.write("{}={}".format(key, value))
+                    escaped_value = value
+                    if " " in value:
+                        escaped_value = "\"" + value + "\""
+                    env_file.write("{}={}".format(key, escaped_value))
                     env_file.write("\n")
                 env_file.flush()
                 env_file.close()
@@ -835,6 +861,7 @@ def main():
                     this_build = build_data["builds"][-1]
                     print("Not implemented")
                     this_build["success"] = True
+                    self.success = True
                     open(os.path.join(project_directory,
                         "outputs/{}.{}.{}.{}.outputs.json"
                         .format(environment, provider, component, command)), 'w').write("{}")
@@ -869,8 +896,9 @@ def main():
                     joinall(receive_exit_code, raise_error=True)
                     os.rename("{}_{}".format(dest_exit_code, host), dest_exit_code)
 
-                    print("Calculating build result")
-                    Component(dependency, environment, provider, component, command).calculate_state()
+                    last_running_build = Component(dependency, environment, provider, component, command, args).calculate_state()
+                    if last_running_build:
+                        self.success = last_running_build["success"]
 
         worker = Worker()
         worker.start()
@@ -929,6 +957,7 @@ def main():
         class CommandRunner(Thread):
             def run(self):
               self.error = False
+              self.success = False
               exit_code_path = get_exit_code_path(project_directory, environment, provider, component, command, build_number)
               if os.path.exists(exit_code_path):
                   os.remove(exit_code_path)
@@ -943,7 +972,7 @@ def main():
                 ensure_file(builds_filename)
                 build_data = json.loads(open(builds_filename).read())
                 this_build = build_data["builds"][-1]
-
+                self.success = True
                 this_build["success"] = True
                 open("outputs/{}-{}-{}.json".format(provider, component, command), 'w').write("{}")
                 write_builds_file(builds_filename, build_data)
@@ -983,8 +1012,9 @@ def main():
                 remove_from_running(dependency)
                 return
 
-              Component(dependency, environment, provider, component, command).calculate_state()
-
+              last_running_build = Component(dependency, environment, provider, component, command, args).calculate_state()
+              if last_running_build:
+                  self.success = last_running_build["success"]
 
 
 
@@ -1003,7 +1033,7 @@ def main():
 
         provider, component, command, manual, local = parse_reference(node)
         parents = list(ancestors(G, node))
-
+        print("retrieving outputs for {}".format(node))
         env = {}
         for parent in parents:
 
@@ -1048,8 +1078,7 @@ def main():
             if isinstance(value, list):
                 cleaned = list(filter(lambda x:x != "", env[key]))
                 unfiltered[key] = cleaned
-                env[key] = "\"" + \
-                " ".join(cleaned) + "\""
+                env[key] = " ".join(cleaned)
         return env, unfiltered
 
     def create_jobs(environment, build):
@@ -1140,7 +1169,7 @@ def main():
       # find running processes from last run
       for item in ordering:
           provider, component, command, manual, local = parse_reference(item)
-          Component(item, args.environment, provider, component, command).calculate_state()
+          Component(item, args.environment, provider, component, command, args).calculate_state()
 
 
       for node in ordering:

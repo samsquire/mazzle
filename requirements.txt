@@ -10,3 +10,5 @@ python-socketio
 SQLAlchemy
 ortools
 parallel-ssh
+pydot
+boto
