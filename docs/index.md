@@ -17,7 +17,7 @@ Write self-descriptive pipelines in dot syntax renderable by graphviz and execut
 
 ![pipeline-running](parallel-components.png)
 
-Notice how from the `vpc` component, dns, security, vault volume can all begin running when vpc has finished.
+Notice how dns, security, vault volume can all begin running at the same time.
 
 ## features
 
