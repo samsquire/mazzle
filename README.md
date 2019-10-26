@@ -1,6 +1,6 @@
 # devops-pipeline
 
-**Prototype code** This is a prototype YMMV very much still in development
+**Prototype code** This is prototype code YMMV very much still in development
 
 This build tool builds infrastructure for environments on the fly. It is meant to be a cross between a continuous integration server, build server and task runner. I call it a runserver. Its primary purpose is to try create complicated environments from scratch in a repeatable and deterministic way.
 
