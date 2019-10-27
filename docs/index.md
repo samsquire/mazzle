@@ -62,14 +62,14 @@ digraph G {
 
 Linux/MacOS only
 
-1. ```
+```
 git clone git@github.com:samsquire/devops-pipeline.git
 ./install.sh
 Logout and log back in
 git clone git@github.com:samsquire/devops-pipeline-starter.git
 cd devops-pipeline-starter
 ```
-2. Update ~/.aws/env to have the following
+2. Update ~/.aws/env to have the following. Upload a keypair to AWS using the console.
 
 ```
 AWS_ACCESS_KEY_ID=
@@ -77,7 +77,7 @@ AWS_SECRET_ACCESS_KEY=
 ```
 3. Take a look around the demo project, which brings up 7 nodes in AWS. See architecture.dot to see how it fits together.
 
-4. Bring up demo project (this will cost money)
+4. Update common.tfvars to include your key name, IP address. Bring up demo project (this will cost money)
 
 ```
 devops-pipeline home --file architecture.dot --gui --discover-workers-from-output workers --workers-key <path to ssh private key> --workers-user ubuntu --keys <gpg key email>
