@@ -9,13 +9,13 @@ def parallelise_components(component_data):
     model = cp_model.CpModel()
 
     component_vars = {}
-    task_run = collections.namedtuple('task_run', 'start group')
+    task_run = collections.namedtuple('task_run', 'start')
     horizon = len(component_data)
 
     for component in component_data:
         suffix = component["name"]
         start_var = model.NewIntVar(0, horizon, 'start/' + suffix)
-        component_vars[suffix] = task_run(start_var, group_var)
+        component_vars[suffix] = task_run(start_var)
 
     parallel_group = collections.defaultdict(list)
     successor_lookup = {}
