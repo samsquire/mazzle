@@ -3,7 +3,7 @@ from threading import Thread, Lock
 from functools import reduce
 import itertools
 import collections
-
+import getpass
 from functools import partial
 from flask import Flask, render_template, Response
 from flask_socketio import SocketIO
@@ -154,7 +154,9 @@ class Component():
         print(outputs_filename)
         decoded = None
         try:
-            decoded = json.loads(open(outputs_filename).read())
+            outputs_file = open(outputs_filename)
+            decoded = json.loads(outputs_file.read())
+            outputs_file.close()
         except:
             return
         pretty_build_number = "{:0>4d}".format(build_number)
@@ -165,15 +167,17 @@ class Component():
           print(encrypt_command)
           encrypter = Popen(encrypt_command, stdin=PIPE, stdout=PIPE, stderr=sys.stderr)
           encoder = Popen(["base64", "--wrap=0"], stdin=encrypter.stdout, stdout=PIPE, stderr=sys.stderr)
-          encrypter.stdin.write(json.dumps(secrets).encode('utf-8'))
+          decrypted = json.dumps(secrets).encode('utf-8')
+
+          encrypter.stdin.write(decrypted)
           encrypter.stdin.close()
           encrypted_secrets, err = encoder.communicate()
           decoded["secrets"] = encrypted_secrets.decode('utf-8')
 
+
         # Write our outputs to the output bucket
         # builds/outputs/{}.{}.{}.{}.outputs.json
-        output_filename = os.path.abspath(os.path.join(project_directory, "outputs/{}.{}.{}.{}.json".format(environment, provider, component, command)))
-        with open(output_filename, 'w') as output_file:
+        with open(outputs_filename, 'w') as output_file:
           output_file.write(json.dumps(decoded))
         # run(["aws", "s3", "cp", output_filename, "s3://vvv-{}-outputs/{}/{}/{}/{}.json"
         #    .format(environment, provider, component, command, pretty_build_number)])
@@ -217,15 +221,17 @@ class Component():
                         build["success"] = False
                         build["status"] = "unknown"
                 else:
-                    print("Build failure")
+                    print("{} Build failure".format(build["reference"]))
                     build["success"] = False
             if "pid" not in build and build["status"] == "running":
                 build["status"] = "unknown"
 
 
         remove_from_running(self.reference)
+        lock.acquire()
         builds_filename = get_builds_filename(self.environment, self.provider, self.component, self.command)
         write_builds_file(builds_filename, {"builds": builds})
+        lock.release()
         return last_running_build
 
 
@@ -257,8 +263,6 @@ def main():
 
     def matcher(item, pattern):
         if item.replace("@", "").startswith(pattern):
-            return True
-        if item.startswith(pattern):
             return True
         if item == pattern:
             return True
@@ -424,7 +428,7 @@ def main():
 
              else:
                  # unpack last artifacts
-                 print("Retrieving previous artifacts...")
+
                  parent_command = "package"
                  parent_builds, last_build_status, _ = get_builds(environment, provider, component, parent_command)
                  last_successful_build = find_last_successful_build(parent_builds)
@@ -436,7 +440,7 @@ def main():
                  last_successful_build_number = last_successful_build["build_number"]
                  last_artifact_name = "{}.{}.{}.{}.tgz".format(environment, provider, component, last_successful_build_number)
                  source_artifact = os.path.abspath(os.path.join("builds/artifacts", last_artifact_name))
-                 print("Source artifact {}".format(source_artifact))
+
                  print("Last artifact name {}".format(last_artifact_name))
                  work_dir_name = "{}_{}_{}_{}_{}".format(environment, provider, component, command, next_build)
                  work_dir_path = os.path.abspath(os.path.join("builds/work", work_dir_name))
@@ -768,6 +772,7 @@ def main():
                 if os.path.exists(exit_code_path):
                     os.remove(exit_code_path)
                 self.error = False
+                lock.acquire()
                 builds_filename = get_builds_filename(environment, provider, component, command)
                 ensure_file(builds_filename)
                 build_data = json.loads(open(builds_filename).read())
@@ -781,7 +786,7 @@ def main():
                 state["running"].append(this_build)
                 build_data["builds"].append(this_build)
                 write_builds_file(builds_filename, build_data)
-
+                lock.release()
                 last_successful_build = find_last_successful_build(builds)
                 if last_successful_build:
                     try:
@@ -855,6 +860,7 @@ def main():
                         ./{} {} {}""".format(remote_env_path, work_path, provider, command, environment, component, remote_log_filename))
 
                 else:
+                    lock.acquire()
                     builds_filename = get_builds_filename(environment, provider, component, command)
                     ensure_file(builds_filename)
                     build_data = json.loads(open(builds_filename).read())
@@ -866,6 +872,7 @@ def main():
                         "outputs/{}.{}.{}.{}.outputs.json"
                         .format(environment, provider, component, command)), 'w').write("{}")
                     write_builds_file(builds_filename, build_data)
+                    lock.release()
                     remove_from_running(dependency)
                     open(os.path.join(get_last_run_path(environment, provider, component, command)), 'w').write(':)')
                     return
@@ -923,7 +930,7 @@ def main():
         env["OUTPUT_PATH"] = os.path.abspath(env["OUTPUT_PATH"])
         env["EXIT_CODE_PATH"] = os.path.abspath(env["EXIT_CODE_PATH"])
         pretty_build_number = get_pretty_build_number(build_number)
-
+        lock.acquire()
         builds_filename = get_builds_filename(environment, provider, component, command)
         ensure_file(builds_filename)
         build_data = json.loads(open(builds_filename).read())
@@ -949,6 +956,7 @@ def main():
                 pass
         build_data["builds"].append(this_build)
         write_builds_file(builds_filename, build_data)
+        lock.release()
     # tag pending before build
     # run(["git", "tag", "pipeline/pending/{}/{}/{}/{}".format(environment, provider, component,
     #    pretty_build_number)], stdout=PIPE)
@@ -974,9 +982,11 @@ def main():
                 this_build = build_data["builds"][-1]
                 self.success = True
                 this_build["success"] = True
+                lock.acquire()
                 open("outputs/{}-{}-{}.json".format(provider, component, command), 'w').write("{}")
                 write_builds_file(builds_filename, build_data)
                 remove_from_running(dependency)
+                lock.release()
                 open(os.path.join(get_last_run_path(environment, provider, component, command)), 'w').write(':)')
                 return
 
@@ -987,6 +997,7 @@ def main():
               environment_file = open(environment_filename, 'w')
               environment_file.write(json.dumps(env, indent=4))
 
+              env["USER"] = getpass.getuser()
               runner = Popen([command,
                  environment,
                  component], cwd=os.path.join(work_dir, provider), stdin=sys.stdin, stdout=log_file, stderr=log_file,
@@ -994,8 +1005,9 @@ def main():
 
 
               this_build["pid"] = runner.pid
+              lock.acquire()
               write_builds_file(builds_filename, build_data)
-
+              lock.release()
               print("{}".format(log_file.name))
               runner.communicate(input=None, timeout=None)
               runner.wait(timeout=None)
@@ -1007,8 +1019,9 @@ def main():
                 del this_build["pid"]
                 print("{} {} Build failed {}".format(dependency, pretty_build_number, runner.returncode))
                 self.error = True
-
+                lock.acquire()
                 write_builds_file(builds_filename, build_data)
+                lock.release()
                 remove_from_running(dependency)
                 return
 
@@ -1069,7 +1082,7 @@ def main():
                     decoder.stdin.close()
                     decrypted_result, err = decrypter.communicate()
                     loaded_outputs['secrets'] = json.loads(decrypted_result.decode('utf-8'))
-                    open(output_filename, 'w').write(json.dumps(loaded_outputs))
+
 
                   env.update(loaded_outputs)
 
