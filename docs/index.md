@@ -14,9 +14,11 @@ Write self-descriptive pipelines in dot syntax renderable by graphviz and execut
 
 [![architecture](architecture.svg)](https://github.com/samsquire/devops-pipeline/blob/master/docs/architecture.svg)
 
+This pipeline is fairly complicated environment that brings up two worker nodes with Ansible and provisions Hashicorp Vault with Terraform. Notice how some components such as dns, security, vault volume can all begin running at the same time as they are independent.
+
 ![pipeline-running](parallel-components.png)
 
-Notice how dns, security, vault volume can all begin running at the same time.
+
 
 ## Features
 
