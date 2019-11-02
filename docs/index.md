@@ -58,7 +58,13 @@ AWS_SECRET_ACCESS_KEY=
 4. Update `common.tfvars` to include your key name, IP address. Bring up demo project (this will cost money)
 
 ```
-devops-pipeline home --file architecture.dot --gui --discover-workers-from-output workers --workers-key <path to ssh private key> --workers-user ubuntu --keys <gpg key email>
+devops-pipeline home \
+           --file architecture.dot \
+	   --gui \
+	   --discover-workers-from-output workers \
+	   --workers-key <path to ssh private key> \
+	   --workers-user ubuntu \
+	   --keys <gpg key email>
 ```
 
 
