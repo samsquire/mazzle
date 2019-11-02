@@ -2,12 +2,11 @@
 
 This is a prototype. YMMV
 
-devops-pipeline is a command line tool to coordinate large complicated environments that are built from multiple devops tools. devops-pipeline is kind of a task runner and its web GUI is modelled to appear like a continuous integration server.
+devops-pipeline is a command line tool to coordinate large complicated environments that are built from multiple devops tools. devops-pipeline is kind of a task runner and its web GUI is modelled to appear like a pipelined continuous integration server.
 
 ## infrastructure as code and pipelines as code
 
-Write self-descriptive pipelines in dot syntax renderable by graphviz and executable by this tool. devops-pipeline uses [Graphviz dot file syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) for its configuration. In devops-pipeline, you **specify the order of pipeline execution and flow of data between components**.
-
+Write self-descriptive pipelines in dot syntax renderable by graphviz and executable by this tool. devops-pipeline uses [Graphviz dot file syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) for its configuration. In devops-pipeline, you **specify the order and dependencies of pipeline execution via flow of data between components**. Data passes between components via environment variables.
 
 # parallel build execution
 
@@ -19,74 +18,51 @@ Write self-descriptive pipelines in dot syntax renderable by graphviz and execut
 
 Notice how dns, security, vault volume can all begin running at the same time.
 
-## features
+## Features
 
  * **Simple GUI** You can use the GUI to trigger builds
  * **Fast builds** devops-pipeline only runs parts of your pipeline that need to run by detecting if they have been changed since the last run.
- * **Parallelisation of devops tools** devops-pipeline knows what part of your infrastructure can run simultaneously, in parallel.
-
-### Example - building and using an AMI
-
-![](java-server.svg)
-
-file: architecture.dot
-```
-digraph G {
-   rankdir="LR";
-   "packer/ubuntu" -> "terraform/appserver";
-}
-```
-
-In the above pipeline `packer/ubuntu` is a `component` that that uses packer to create machine images on AWS with Java installed. **packer/ubuntu outputs an AMI ID.** `terraform/appserver` is another component that needs this AMI ID to bring up a new instance running that AMI.
-
-## Example - building and releasing a Java app
-
-![](gradle-app.svg)
-
-file: architecture.dot
-
-```
-digraph G {
-  rankdir="LR";
-  "ansible/machines" -> "gradle/app" -> "ansible/deploy" -> "ansible/release";
-}
-```
-`ansible/machines` is a component that provisions machines running java.
-`gradle/app` is a component that builds from source a Java app. One of `gradle/app`'s outputs is a path to an artifact; a set of jar files.
+ * **Parallelisation** devops-pipeline knows what part of your infrastructure can run simultaneously, in parallel.
+* **Scale out with SSH workers** Builds can be run on worker nodes to run builds on cloud machines
 
 # introduction
 
-`devops-pipeline` is for deterministically creating computer environments. An example environment is one that could use AWS, Terraform, Packer, shell scripts, Ansible, docker, Chef. `devops-pipeline` allows you to chain together tools for running on your developer workstation. devops-pipeline models the flow of data between tools and uses environment variables to pass along data. devops-pipeline is meant to be used after each change whereby it runs validations, unit tests, smoke tests and deployments tests.
+`devops-pipeline` is for deterministically creating computer environments. An example environment is one that could use AWS, Terraform, Packer, shell scripts, Ansible, docker, Chef for testing. `devops-pipeline` allows you to chain together tools for running on your developer workstation. devops-pipeline models the flow of data between tools and uses environment variables to pass along data. devops-pipeline is meant to be used after each change whereby it runs validations, unit tests, smoke tests and deployments tests.
 
 # quickstart
 
-Linux/MacOS only
+1. Linux/MacOS only
 
 ```
 git clone git@github.com:samsquire/devops-pipeline.git
-./install.sh
-Logout and log back in
+cd devops-pipeline
+./install.sh  # adds devops-pipeline to your path via /etc/profile.d/devops-pipeline.sh
+```
+2. Logout and log back in
+
+```
 git clone git@github.com:samsquire/devops-pipeline-starter.git
 cd devops-pipeline-starter
 ```
-2. Update ~/.aws/env to have the following. Upload a keypair to AWS using the console.
+2. Update ~/.aws/env to have the following. Upload a keypair to AWS using the AWS console.
 
 ```
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
 ```
+
 3. Take a look around the demo project, which brings up 7 nodes in AWS. See architecture.dot to see how it fits together.
 
-4. Update common.tfvars to include your key name, IP address. Bring up demo project (this will cost money)
+4. Update `common.tfvars` to include your key name, IP address. Bring up demo project (this will cost money)
 
 ```
 devops-pipeline home --file architecture.dot --gui --discover-workers-from-output workers --workers-key <path to ssh private key> --workers-user ubuntu --keys <gpg key email>
 ```
 
 
-# how it works and adding new tools to devops-pipeline
+# structuring your code as a monorepository
 
-To understand how devops-pipeline works, you need to understand the directory structure. **Your code is separated by directory by each tool**. Like a **monorepository**, you divide your code by tool, so you have a directory for ansible code, a directory for terraform code. Devops-pipeline walks your pipeline and runs shellscripts inside each directory to activate each tool.
+Your code is separated by directory by each tool. Like a **monorepository**, you divide your code by tool, so you have a directory for ansible code, a directory for terraform code. Devops-pipeline the pipeline and runs shellscripts inside each directory to activate each tool.
 
 For example:
 
@@ -97,33 +73,6 @@ terraform/
 packer/
 chef/
 ```
-
-# Lifecycle Commands
-
-Devops-pipeline runs lifecycle commands inside provider directories. It runs a lifecycle commands within the provider directory. Some lifecycle commands will be familiar, such as:
-
- * **validate**
- * **test**
- * **run**
-
-Supporting additional tools in devops-pipeline is simple. You need to provide at the very least, a `run` script for that tool. You place this inside the provider directory. So, to introducea new devops tool **xyz**, you would create an **xyz** directory and introduce a **run** script in the **xyz** directory **xyz/run**.
-
-## run
-
-Run needs to handle following environment variables:
-
-* EXIT_CODE_PATH
-* OUTPUT_PATH
-
-## Internal lifecycle command: component-paths
-
-devops-pipeline uses the `component-paths` script to detect if a component has changed. This script should return all files linked to the component.
-
-```
-./ansible/component-paths <environment> <component>
-```
-
-The above command should return all the files for running component
 
 # SSH workers
 
@@ -166,7 +115,35 @@ digraph G {
 }
 ```
 
-# Quickstart
+### Example - building and using an AMI
+
+![](java-server.svg)
+
+file: architecture.dot
+```
+digraph G {
+   rankdir="LR";
+   "packer/ubuntu" -> "terraform/appserver";
+}
+```
+
+In the above pipeline `packer/ubuntu` is a `component` that that uses packer to create machine images on AWS with Java installed. **packer/ubuntu outputs an AMI ID.** `terraform/appserver` is another component that needs this AMI ID to bring up a new instance running that AMI.
+
+## Example - building and releasing a Java app
+
+![](gradle-app.svg)
+
+file: architecture.dot
+
+```
+digraph G {
+  rankdir="LR";
+  "ansible/machines" -> "gradle/app" -> "ansible/deploy" -> "ansible/release";
+}
+```
+`ansible/machines` is a component that provisions machines running java.
+`gradle/app` is a component that builds from source a Java app. One of `gradle/app`'s outputs is a path to an artifact; a set of jar files.
+
 
 
 # why devops-pipeline
