@@ -4,7 +4,7 @@
 
 This build tool builds infrastructure for environments on the fly. It is meant to be a cross between a continuous integration server, build server and task runner. I call it a runserver. Its primary purpose is to try create complicated environments from scratch in a repeatable and deterministic way.
 
-* This is the tool you run after making changes to your code.
+* This is the tool you run after making changes to your "as code" thing such as pipeline code, configuration management or Terraform
 * It's what you run to begin tests.
 * It's how you check to see if your changes have broken any thing anywhere on your stack.
 * It runs against your entire stack by default.
