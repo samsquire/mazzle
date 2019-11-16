@@ -26,6 +26,7 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
  * **Fast builds** devops-pipeline only runs parts of your pipeline that need to run by detecting if they have been changed since the last run.
  * **Parallelisation** devops-pipeline knows what part of your infrastructure can run simultaneously, in parallel.
 * **Scale out with SSH workers** Builds can be run on worker nodes to run builds on cloud machines
+* **Secret handling** Encrypts sensitive outputs at rest with your GPG keys.
 
 # introduction
 
