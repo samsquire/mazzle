@@ -31,42 +31,6 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
 
 `devops-pipeline` is for deterministically creating computer environments. An example environment is one that could use AWS, Terraform, Packer, shell scripts, Ansible, docker, Chef for testing. `devops-pipeline` allows you to chain together tools for running on your developer workstation. devops-pipeline models the flow of data between tools and uses environment variables to pass along data. devops-pipeline is meant to be used after each change whereby it runs validations, unit tests, smoke tests and deployments tests.
 
-# quickstart
-
-1. Linux/MacOS only
-
-```
-git clone git@github.com:samsquire/devops-pipeline.git
-cd devops-pipeline
-./install.sh  # adds devops-pipeline to your path via /etc/profile.d/devops-pipeline.sh
-```
-2. Logout and log back in
-
-```
-git clone git@github.com:samsquire/devops-pipeline-starter.git
-cd devops-pipeline-starter
-```
-2. Update ~/.aws/env to have the following. Upload a keypair to AWS using the AWS console.
-
-```
-AWS_ACCESS_KEY_ID=
-AWS_SECRET_ACCESS_KEY=
-```
-
-3. Take a look around the demo project, which brings up 7 nodes in AWS. See architecture.dot to see how it fits together.
-
-4. Update `common.tfvars` to include your key name, IP address. Bring up demo project (this will cost money)
-
-```
-devops-pipeline home \
-           --file architecture.dot \
-	   --gui \
-	   --discover-workers-from-output workers \
-	   --workers-key <path to ssh private key> \
-	   --workers-user ubuntu \
-	   --keys <gpg key email>
-```
-
 
 # structuring your code as a monorepository
 
@@ -151,6 +115,44 @@ digraph G {
 ```
 `ansible/machines` is a component that provisions machines running java.
 `gradle/app` is a component that builds from source a Java app. One of `gradle/app`'s outputs is a path to an artifact; a set of jar files.
+
+
+# quickstart
+
+1. Linux/MacOS only
+
+```
+git clone git@github.com:samsquire/devops-pipeline.git
+cd devops-pipeline
+./install.sh  # adds devops-pipeline to your path via /etc/profile.d/devops-pipeline.sh
+```
+2. Logout and log back in
+
+```
+git clone git@github.com:samsquire/devops-pipeline-starter.git
+cd devops-pipeline-starter
+```
+2. Update ~/.aws/env to have the following. Upload a keypair to AWS using the AWS console.
+
+```
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+```
+
+3. Take a look around the demo project, which brings up 7 nodes in AWS. See architecture.dot to see how it fits together.
+
+4. Update `common.tfvars` to include your key name, IP address. Bring up demo project (this will cost money)
+
+```
+devops-pipeline home \
+           --file architecture.dot \
+	   --gui \
+	   --discover-workers-from-output workers \
+	   --workers-key <path to ssh private key> \
+	   --workers-user ubuntu \
+	   --keys <gpg key email>
+```
+
 
 
 
