@@ -37,7 +37,7 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
 
 # structuring your code as a monorepository
 
-Your code is separated by directory by each tool. Like a **monorepository**, you divide your code by tool, so you have a directory for ansible code, a directory for terraform code. Devops-pipeline the pipeline and runs shellscripts inside each directory to activate each tool.
+Your code is separated by directory by each tool. Like a **monorepository**, you divide your code by tool, so you have a directory for ansible code, a directory for terraform code. Devops-pipeline loops through these directories and runs a lifecycle command that you have in each code directory.
 
 For example:
 
