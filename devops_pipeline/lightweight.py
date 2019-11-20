@@ -247,7 +247,7 @@ class Worker(Thread):
         for parent in self.item["ancestors"]:
             states[self.item["name"]] = "waiting"
             threads[parent].join()
-            if threads[parent].error:
+            if threads[parent].error == True:
                 states[self.item["name"]] = "aborted"
                 return
         states[self.item["name"]] = "running"
@@ -287,12 +287,13 @@ class Worker(Thread):
                env=env)
             runner.communicate(input=None, timeout=None)
             runner.wait(timeout=None)
-            exit_code = open(env["EXIT_CODE_PATH"]).read()
+            exit_code = int(open(env["EXIT_CODE_PATH"]).read())
             if exit_code != 0:
                 states[self.item["name"]] = "error"
                 self.error = True
+                print("ERROR")
             else:
-                open(os.path.join(get_last_run_path(environment, provider, component, command)), 'w').write(':)')
+                open(os.path.join(get_last_run_path(self.environment, self.provider, self.component, self.command)), 'w').write(':)')
 
         states[self.item["name"]] = "finished"
 
@@ -315,8 +316,8 @@ class ThreadMonitor(Thread):
             time.sleep(0.5)
             sys.stdout.write("\r\033[K{}                                "
                 .format(" ".join(running)))
-            sys.stdout.write("\n\r\033[K{} running {} waiting {} finished {} up-to-date {} error         "
-                .format(totals["running"], totals["waiting"], totals["finished"], totals["aborted"], totals["up-to-date"], totals["error"]))
+            sys.stdout.write("\n\r\033[K{} running {} waiting {} finished {} up-to-date {} error  {} aborted        "
+                .format(totals["running"], totals["waiting"], totals["finished"], totals["up-to-date"], totals["error"], totals["aborted"]))
             sys.stdout.write("\033[F")
 
             if len(threads.items()) == totals["finished"]:
