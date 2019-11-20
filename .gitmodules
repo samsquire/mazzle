@@ -1,0 +1,3 @@
+[submodule "devops_pipeline/web"]
+	path = devops_pipeline/web
+	url = https://github.com/samsquire/devops-pipeline-gui.git
