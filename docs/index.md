@@ -122,12 +122,15 @@ digraph G {
 
 # quickstart
 
-1. Linux/MacOS only
+1. Ubuntu
 
 ```
 git clone git@github.com:samsquire/devops-pipeline.git
 cd devops-pipeline
 ./install.sh  # adds devops-pipeline to your path via /etc/profile.d/devops-pipeline.sh
+sudo apt-get install python3-pip
+pip3 install -r ../devops-pipeline/requirements.txt
+
 ```
 2. Logout and log back in
 
