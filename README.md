@@ -131,8 +131,7 @@ devops-pipeline is a command line tool with a GUI to coordinate bringing up envi
 
 # Installation
 
-1. Clone this repository
-2. Run `./install.sh'
+See [devops-pipeline.com](http://devops-pipeline.com)
 
 # Worker support
 
