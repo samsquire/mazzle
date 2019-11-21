@@ -24,7 +24,7 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
 
 ## Features
 
- * **Simple GUI** You can use the GUI to trigger builds of entire environments or individual builds. Clicking View on an environment means you will only see components from that environment. You can see colourized console logs for component runs too.
+ * **Simple GUI** You can use the GUI to trigger builds of entire environments or individual builds. Clicking Switch to Environment on an environment means you will only see components from that environment. You can see colourized console logs for component runs too.
  * **Fast builds** devops-pipeline only runs parts of your pipeline that need to run by detecting if they have been changed since the last run.
  * **Parallelisation** devops-pipeline knows what part of your infrastructure can run simultaneously, in parallel.
 * **Scale out with SSH workers** Builds can be run on worker nodes to run builds on cloud machines
