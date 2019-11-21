@@ -24,12 +24,14 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
 
 ## Features
 
+
  * **Simple GUI** You can use the GUI to trigger builds of entire environments or individual builds. Clicking Switch to Environment on an environment means you will only see components from that environment. You can see colourized console logs for component runs too.
  * **Fast builds** devops-pipeline only runs parts of your pipeline that need to run by detecting if they have been changed since the last run.
  * **Parallelisation** devops-pipeline knows what part of your infrastructure can run simultaneously, in parallel.
 * **Scale out with SSH workers** Builds can be run on worker nodes to run builds on cloud machines
 * **Secret handling** Encrypts sensitive outputs at rest with your GPG keys.
 * **Progress bars** Devops-pipeline uses log size to calculate progress bars as a rough approximation of completedness.
+* **Fire and forget builds** When devops-pipeline runs a project, it packages it for running in a different working directory. This means you can continue to make changes to your source tree without impacting the running build. 
 
 # introduction
 
@@ -40,7 +42,7 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
 
 Your code is separated by directory by each tool. Like a **monorepository**, you divide your code by tool, so you have a directory for ansible code, a directory for terraform code. Devops-pipeline loops through these directories and runs a lifecycle command that you have in each code directory.
 
-For example:
+For example, you have the following code directories:
 
 ```
 ansible/
@@ -49,6 +51,13 @@ terraform/
 packer/
 chef/
 ```
+
+Devops-pipeline will cd to these directories and run a lifecycle command, which could be one of the following:
+
+* ansible/validate
+* ansible/run
+* ansible/test
+
 
 # SSH workers
 
