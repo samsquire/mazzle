@@ -29,6 +29,7 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
  * **Parallelisation** devops-pipeline knows what part of your infrastructure can run simultaneously, in parallel.
 * **Scale out with SSH workers** Builds can be run on worker nodes to run builds on cloud machines
 * **Secret handling** Encrypts sensitive outputs at rest with your GPG keys.
+* **Progress bars** Devops-pipeline uses log size to calculate progress bars as a rough approximation of completedness.
 
 # introduction
 
