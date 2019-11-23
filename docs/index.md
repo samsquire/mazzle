@@ -58,6 +58,18 @@ Devops-pipeline will cd to these directories and run a lifecycle command, which 
 * ansible/run
 * ansible/test
 
+# passing data along a pipeline
+
+Each life cycle command shell script is called with the environment variables:
+
+ * `OUTPUT_PATH`
+ * `EXIT_CODE_PATH`
+
+The `OUTPUT_PATH` is an absolute path to a file that you should write outputs as a JSON file. The EXIT_CODE_PATH is where you should write an exit code of the lifecycle command. If it is 0 then the build is considered to be successful.
+
+Each time `devops-pipeline` runs a pipeline, it passes outputs of all downstream variables to to your pipeline command as environment variables.
+
+
 
 # SSH workers
 
