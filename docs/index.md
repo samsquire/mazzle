@@ -25,18 +25,17 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
 ## Features
 
 
- * **Simple GUI** You can use the GUI to trigger builds of entire environments or individual builds. Clicking Switch to Environment on an environment means you will only see components from that environment. You can see colourized console logs for component runs too.
+ * **Simple GUI** You can use the GUI to trigger builds of entire environments or individual components. Clicking Switch to Environment on an environment means you will only see components from that environment. You can see colourized console logs for component runs too.
  * **Fast builds** devops-pipeline only runs parts of your pipeline that need to run by detecting if they have been changed since the last run.
  * **Parallelisation** devops-pipeline knows what part of your infrastructure can run simultaneously, in parallel.
 * **Scale out with SSH workers** Builds can be run on worker nodes to run builds on cloud machines. It is idiomatic devops-pipeline to spin up your worker nodes at the beginning of a pipeline. See below.
 * **Secret handling** Encrypts sensitive outputs at rest with your GPG keys.
 * **Progress bars** Devops-pipeline uses log size to calculate progress bars as a rough approximation of completedness.
 * **Fire and forget builds** When devops-pipeline runs a project, it packages it for running in a different working directory. This means you can continue to make changes to your source tree without impacting the running build. 
-* **Require artifacts** You can require an artifact from a previous stage.
 
 # introduction
 
-`devops-pipeline` is for deterministically creating computer environments. An example environment is one that could use AWS, Terraform, Packer, shell scripts, Ansible, docker, Chef for testing. `devops-pipeline` allows you to chain together tools for running on your developer workstation. devops-pipeline models the flow of data between tools and uses environment variables to pass along data. devops-pipeline is meant to be used after each change whereby it runs validations, unit tests, smoke tests and deployments tests.
+`devops-pipeline` is for deterministically creating computer environments. An example environment is one that could use AWS, Terraform, Packer, shell scripts, Ansible, docker, Chef Inspec for testing. `devops-pipeline` allows you to chain together tools for running on your developer workstation. devops-pipeline models the flow of data between tools and uses environment variables to pass along data. devops-pipeline is meant to be used after each change whereby it runs validations, unit tests, smoke tests and deployments tests.
 
 
 # structuring your code as a monorepository
