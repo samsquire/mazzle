@@ -23,6 +23,8 @@ from pssh.utils import load_private_key
 from gevent import joinall
 import networkx as nx
 import sys, json
+import re
+from shutil import copy
 
 import sys
 dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -255,7 +257,8 @@ def main():
     parser.add_argument("--no-trigger", action="store_true", default=False)
 
     for path in ["builds/artifacts", "builds/environments", "builds/exits",
-        "builds/history", "builds/last_runs", "builds/work", "builds/outputs"]:
+        "builds/history", "builds/last_runs", "builds/envs", "builds/work",
+        "builds/outputs", "builds/published"]:
         if not os.path.isdir(path):
             os.makedirs(path)
 
@@ -375,7 +378,7 @@ def main():
              component_paths_script = os.path.join(provider, "component-paths")
              if not args.force and last_successful and os.path.isfile(component_paths_script):
 
-                component_paths_output = run(["component-paths", environment, component],
+                component_paths_output = run(["./component-paths", environment, component],
                     cwd=os.path.join(project_directory, provider), stdout=PIPE).stdout.decode('utf-8').strip()
                 component_paths = component_paths_output.split("\n")
 
@@ -747,7 +750,8 @@ def main():
     def construct_environment(work_directory, build_number, environment, provider, component, command, previous_outputs):
         env = {
             "OUTPUT_PATH": os.path.join(work_directory, "builds/outputs/{}.{}.{}.{}.outputs.json".format(environment, provider, component, command)),
-            "EXIT_CODE_PATH": get_exit_code_path(work_directory, environment, provider, component, command, build_number)
+            "EXIT_CODE_PATH": get_exit_code_path(work_directory, environment, provider, component, command, build_number),
+            "ARTIFACT_PATH": os.path.join(work_directory, "builds/published/{}.{}.{}.{}.{}.tgz".format(environment, provider, component, command, build_number))
         }
         env.update(previous_outputs)
         env["BUILD_NUMBER"] = str(build_number)
@@ -812,6 +816,9 @@ def main():
                 client.join(cmd)
                 cmd = client.run_command("mkdir -p builds/logs")
                 client.join(cmd)
+                cmd = client.run_command("mkdir -p builds/published")
+                client.join(cmd)
+
 
                 env = construct_environment("", build_number, environment, provider, component, command, previous_outputs)
                 work_path = "builds/work/{}.{}.{}.{}".format(environment, provider, component, command)
@@ -847,6 +854,21 @@ def main():
                 test_exists = client.run_command(test_command)
                 client.join(test_exists)
 
+                print("Running require")
+                chosen_file = run_require("", environment, provider, component, command)
+                if chosen_file:
+                     print(chosen_file)
+                     destination_path = os.path.join(work_path, os.path.basename(chosen_file))
+                     print("Copying {} to remote {}".format(chosen_file, destination_path))
+
+                     cmds = client.scp_send(chosen_file, destination_path, True)
+                     joinall(cmds, raise_error=True)
+                     unzip_command = "cd {} ; tar -xf {}".format(work_path, os.path.basename(chosen_file))
+                     unzip_artifact = client.run_command(unzip_command)
+                     print(unzip_command)
+                     client.join(unzip_artifact)
+
+
                 if test_exists[host]["exit_code"] == 0:
                     print("Running build remotely")
                     ran_remotely = True
@@ -854,8 +876,8 @@ def main():
                     build_command = client.run_command("""set -a ;
                         source {} ;
                         export OUTPUT_PATH=$(readlink -f ${{OUTPUT_PATH}}) ;
-                        echo ${{OUTPUT_PATH}} ;
                         export EXIT_CODE_PATH=$(readlink -f ${{EXIT_CODE_PATH}}) ;
+                        export ARTIFACT_PATH=$(readlink -f ${{ARTIFACT_PATH}}) ;
                         cd {}/{} ;
                         ./{} {} {}""".format(remote_env_path, work_path, provider, command, environment, component, remote_log_filename))
 
@@ -869,7 +891,7 @@ def main():
                     this_build["success"] = True
                     self.success = True
                     open(os.path.join(project_directory,
-                        "outputs/{}.{}.{}.{}.outputs.json"
+                        "builds/outputs/{}.{}.{}.{}.outputs.json"
                         .format(environment, provider, component, command)), 'w').write("{}")
                     write_builds_file(builds_filename, build_data)
                     lock.release()
@@ -903,6 +925,16 @@ def main():
                     joinall(receive_exit_code, raise_error=True)
                     os.rename("{}_{}".format(dest_exit_code, host), dest_exit_code)
 
+                    print("Downloading artifact...")
+                    check_for_artifacts = client.run_command("test -f {}".format("builds/published/{}.{}.{}.{}.{}.tgz".format(environment, provider, component, command, build_number)))
+                    client.join(check_for_artifacts)
+
+                    if check_for_artifacts[host]["exit_code"] == 0:
+                        dest_artifact = os.path.join(project_directory, "builds/published/{}.{}.{}.{}.{}.tgz".format(environment, provider, component, command, build_number))
+                        receive_artifact = client.copy_remote_file(os.path.join("builds/published/{}.{}.{}.{}.{}.tgz".format(environment, provider, component, command, build_number)), dest_artifact)
+                        joinall(receive_artifact, raise_error=True)
+                        os.rename("{}_{}".format(dest_artifact, host), dest_artifact)
+
                     last_running_build = Component(dependency, environment, provider, component, command, args).calculate_state()
                     if last_running_build:
                         self.success = last_running_build["success"]
@@ -911,6 +943,50 @@ def main():
         worker.start()
         return worker
 
+    # Find artifact file
+    def run_require(work_dir, environment, provider, component, command):
+
+        if os.path.isfile(os.path.join(work_dir, provider, "require")) and command == "run":
+            require = Popen(["./require",
+             environment,
+             component], cwd=os.path.join(work_dir, provider), stdin=sys.stdin, stdout=PIPE, stderr=sys.stderr)
+            require_stdout, require_stderr = require.communicate()
+            lines = require_stdout.decode('utf-8').split("\n")
+            lines.pop()
+            for requirement in lines:
+                requirement_name, specification = requirement.split(" ")
+                requirement_provider, requirement_component = requirement_name.split("/")
+                print(requirement_name)
+                print(specification)
+                dependencies = Popen(["bash", "-c", "find builds/published  -printf \"%T+\t%p\n\" | sort -r"], stdout=PIPE)
+                sorted, dep_errors = dependencies.communicate()
+                available = sorted.decode('utf-8').split("\n")
+                available.pop()
+                match = "{}\.{}\.{}\.{}\..*\.tgz".format(environment, requirement_provider, requirement_component, "run")
+                chosen_file = None
+                for availability in available:
+                    times, file = availability.split("\t")
+                    # we found a file that matched what we're looking for
+                    if re.match(match, file.split("/")[-1]):
+                        if specification == "latest":
+                            chosen_file = file
+                            break
+                        elif specification == "latestSuccessful":
+                            builds_filename = get_builds_filename(environment, requirement_provider, requirement_component, "run")
+                            ensure_file(builds_filename)
+                            build_data = json.loads(open(builds_filename).read())
+                            for build in reversed(build_data["builds"]):
+                                print(file.split(".")[4])
+                                if build["success"] == True and \
+                                  build["reference"].endswith("{}/{}/{}".format(requirement_provider, requirement_component, "run")) \
+                                  and build["build_number"] == int(file.split(".")[4]):
+                                    chosen_file = file
+                                    break
+                            if chosen_file:
+                                break
+                # copy chosen_file
+                if chosen_file:
+                    return chosen_file
 
     def run_build(work_dir,
         build_number,
@@ -929,6 +1005,7 @@ def main():
         env = construct_environment(project_directory, build_number, environment, provider, component, command, previous_outputs)
         env["OUTPUT_PATH"] = os.path.abspath(env["OUTPUT_PATH"])
         env["EXIT_CODE_PATH"] = os.path.abspath(env["EXIT_CODE_PATH"])
+        env["ARTIFACT_PATH"] = os.path.abspath(env["ARTIFACT_PATH"])
         pretty_build_number = get_pretty_build_number(build_number)
         lock.acquire()
         builds_filename = get_builds_filename(environment, provider, component, command)
@@ -983,7 +1060,7 @@ def main():
                 self.success = True
                 this_build["success"] = True
                 lock.acquire()
-                open("outputs/{}-{}-{}.json".format(provider, component, command), 'w').write("{}")
+                open("builds/outputs/{}-{}-{}.json".format(provider, component, command), 'w').write("{}")
                 write_builds_file(builds_filename, build_data)
                 remove_from_running(dependency)
                 lock.release()
@@ -996,6 +1073,14 @@ def main():
               environment_filename = os.path.join(project_directory, "builds/environments/{}-{}-{}-{}.env".format(environment, provider, component, command))
               environment_file = open(environment_filename, 'w')
               environment_file.write(json.dumps(env, indent=4))
+
+
+              print("Running require")
+              chosen_file = run_require(work_dir, environment, provider, component)
+              if chosen_file:
+                  copy(chosen_file, os.path.join(work_dir))
+                  extract_dependency = Popen(["tar", "xvf", os.path.join(work_dir, os.path.basename(chosen_file)), "-C", work_dir])
+                  extract_dependency.communicate()
 
               env["USER"] = getpass.getuser()
               runner = Popen([command,
