@@ -14,7 +14,7 @@ Write self-descriptive pipelines in dot syntax renderable by graphviz and execut
 
 `devops-pipeline` knows what parts of your environment infrastructure can run together concurrently and in parallel due to its configuration being a graph file. Here is an example graph and GUI screenshot.
 
-[![architecture](architecture.svg)](https://github.com/samsquire/devops-pipeline/blob/master/docs/architecture.svg)
+[![architecture](architecture.png)](https://github.com/samsquire/devops-pipeline/blob/master/docs/architecture.png)
 
 This pipeline is fairly complicated environment that brings up two worker nodes with Ansible and provisions Hashicorp Vault with Terraform. Notice how some components such as dns, security, vault volume can all begin running at the same time as they are independent.
 
