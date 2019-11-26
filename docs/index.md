@@ -65,12 +65,45 @@ Each life cycle command shell script is called with the environment variables:
 
  * `OUTPUT_PATH`
  * `EXIT_CODE_PATH`
+ * `ARTIFACT_PATH`
 
 The `OUTPUT_PATH` is an absolute path to a file that you should write outputs as a JSON file. The EXIT_CODE_PATH is where you should write an exit code of the lifecycle command. If it is 0 then the build is considered to be successful.
 
+ARTIFACT_PATH is a path that you should save an archive of parts of your working directory to be `require`d from another pipeline.
+
 Each time `devops-pipeline` runs a pipeline, it passes outputs of all downstream variables to to your pipeline command as environment variables.
 
+# depending on artifacts
 
+To depend on an artifact, such as an archived workspace from a previous build (see ARTIFACT_PATH above) create a file called `require` in your root of a provider directory. It should contain the name of the pipeline to pull artifacts from and the words `latest` or `latestSuccessful`. Latest means the last created artifact and latestSuccessful means the last artifact that was a succeeding build.
+
+For example, the following pulls in `gradle/app`
+
+```
+#!/bin/bash
+
+ENV=$1
+
+if [ -z $ENV ] ; then
+  echo "need to provide environment name"
+  exit 1
+fi
+shift
+
+COMPONENT=$1
+echo $COMPONENT >&2
+
+if [ -z $COMPONENT ] ; then
+  echo "need to provide component name"
+  exit 1
+fi
+shift
+
+if [[ "${COMPONENT}" == "deploy" ]]; then
+  echo "gradle/app latestSuccessful"
+fi
+
+```
 
 # SSH workers
 
