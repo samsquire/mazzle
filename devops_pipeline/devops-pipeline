@@ -870,7 +870,8 @@ def main():
                         host,
                         destination_path)
                      print(rsync_command)
-                     Popen(["bash", "-c", rsync_command])
+                     rsync = Popen(["bash", "-c", rsync_command])
+                     rsync.communicate()
 
                      unzip_command = "cd {} ; tar -xf {}".format(work_path, os.path.basename(chosen_file))
                      unzip_artifact = client.run_command(unzip_command)
