@@ -14,7 +14,7 @@ Write self-descriptive pipelines in dot syntax renderable by graphviz and execut
 
 `devops-pipeline` knows what parts of your environment infrastructure can run together concurrently and in parallel due to its configuration being a graph file. Here is an example graph and GUI screenshot.
 
-[![architecture](architecture.png)](https://github.com/samsquire/devops-pipeline/blob/master/docs/architecture.png)
+[![architecture](architecture.tb.png)](https://github.com/samsquire/devops-pipeline/blob/master/docs/architecture.tb.png)
 
 This pipeline is fairly complicated environment that brings up two worker nodes with Ansible and provisions Hashicorp Vault with Terraform. Notice how some components such as dns, security, vault volume can all begin running at the same time as they are independent.
 
@@ -31,7 +31,7 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
 * **Scale out with SSH workers** Builds can be run on worker nodes to run builds on cloud machines. It is idiomatic devops-pipeline to spin up your worker nodes at the beginning of a pipeline. See below.
 * **Secret handling** Encrypts sensitive outputs at rest with your GPG keys.
 * **Progress bars** Devops-pipeline uses log size to calculate progress bars as a rough approximation of completedness.
-* **Fire and forget builds** When devops-pipeline runs a project, it packages it for running in a different working directory. This means you can continue to make changes to your source tree without impacting the running build. 
+* **Fire and forget builds** When devops-pipeline runs a project, it packages it for running in a different working directory. This means you can continue to make changes to your source tree without impacting the running build.
 
 # introduction
 
@@ -70,7 +70,7 @@ devops-pipeline --file architecture.dot \
     --workers-user ubuntu
 ```
 
-If you're provisioning worker nodes as part of  your pipeline, which is what we recommend, you can output the machine hostnames as an output and use `--discover-workers-from-output output-name`. 
+If you're provisioning worker nodes as part of  your pipeline, which is what we recommend, you can output the machine hostnames as an output and use `--discover-workers-from-output output-name`.
 
 ## idiom - provision SSH workers at the beginning of your pipeline
 
