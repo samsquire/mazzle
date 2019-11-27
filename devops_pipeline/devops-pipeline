@@ -861,8 +861,17 @@ def main():
                      destination_path = os.path.join(work_path, os.path.basename(chosen_file))
                      print("Copying {} to remote {}".format(chosen_file, destination_path))
 
-                     cmds = client.scp_send(chosen_file, destination_path, True)
-                     joinall(cmds, raise_error=True)
+                     # cmds = client.scp_send(chosen_file, destination_path, True)
+                     # joinall(cmds, raise_error=True)
+                     rsync_command = "rsync -Pav -e \"ssh -i {}\" {} {}@{}:{}".format(
+                        args.workers_key[0],
+                        chosen_file,
+                        args.workers_user,
+                        host,
+                        destination_path)
+                     print(rsync_command)
+                     Popen(["bash", "-c", rsync_command])
+
                      unzip_command = "cd {} ; tar -xf {}".format(work_path, os.path.basename(chosen_file))
                      unzip_artifact = client.run_command(unzip_command)
                      print(unzip_command)
@@ -1076,10 +1085,10 @@ def main():
 
 
               print("Running require")
-              chosen_file = run_require(work_dir, environment, provider, component)
+              chosen_file = run_require(work_dir, environment, provider, component, command)
               if chosen_file:
                   copy(chosen_file, os.path.join(work_dir))
-                  extract_dependency = Popen(["tar", "xvf", os.path.join(work_dir, os.path.basename(chosen_file)), "-C", work_dir])
+                  extract_dependency = Popen(["tar", "xf", os.path.join(work_dir, os.path.basename(chosen_file)), "-C", work_dir])
                   extract_dependency.communicate()
 
               env["USER"] = getpass.getuser()
