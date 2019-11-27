@@ -4,4 +4,5 @@ logs
 *.pyc
 .DS_Store
 .~lock*
+npm-debug.log
 
