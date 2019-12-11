@@ -747,6 +747,14 @@ def main():
     class BuildFailure(Exception):
         pass
 
+    def expand_secrets(path, previous, current):
+        for k, v in current.items():
+            if isinstance(v, dict):
+                expand_secrets(path + "." + k, previous, v)
+            else:
+                previous[path + "." + k] = v
+        return previous
+
     def construct_environment(work_directory, build_number, environment, provider, component, command, previous_outputs):
         env = {
             "OUTPUT_PATH": os.path.join(work_directory, "builds/outputs/{}.{}.{}.{}.outputs.json".format(environment, provider, component, command)),
@@ -754,6 +762,9 @@ def main():
             "ARTIFACT_PATH": os.path.join(work_directory, "builds/published/{}.{}.{}.{}.{}.tgz".format(environment, provider, component, command, build_number))
         }
         env.update(previous_outputs)
+        if "secrets" in env:
+            expand_secrets("secrets", env, env["secrets"])
+            del env["secrets"]
         env["BUILD_NUMBER"] = str(build_number)
         env["ENVIRONMENT"] = str(environment)
         return env
@@ -838,6 +849,7 @@ def main():
                     if " " in value:
                         escaped_value = "\"" + value + "\""
                     env_file.write("{}={}".format(key, escaped_value))
+
                     env_file.write("\n")
                 env_file.flush()
                 env_file.close()
