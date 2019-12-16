@@ -14,6 +14,7 @@ This build tool builds infrastructure for environments on the fly. It is meant t
 This tool executes a [dot syntax graph](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) of an entire environment. The following graph:
 
  * provisions two CI workers with Ansible - future steps are executed on these workers
+ * installs kubernetes on these workers
  * provisions 3 AMI builds  - base image, authenticated image and java image
  * Sets up Bastion servers with Terraform
  * Installs Prometheus and Grafana with Terraform
