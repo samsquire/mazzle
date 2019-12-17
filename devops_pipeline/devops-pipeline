@@ -258,7 +258,7 @@ def main():
 
     for path in ["builds/artifacts", "builds/environments", "builds/exits",
         "builds/history", "builds/last_runs", "builds/envs", "builds/work",
-        "builds/outputs", "builds/published"]:
+        "builds/outputs", "builds/published", "builds/logs"]:
         if not os.path.isdir(path):
             os.makedirs(path)
 
@@ -332,27 +332,11 @@ def main():
             for index, doer in enumerate(doers):
                 doer.join()
 
-
-
-    class StreamWorker(Thread):
-        def __init__(self, streams, doer_cache, environment, pattern):
-            super(StreamWorker, self).__init__()
-            self.streams = streams
-            self.doer_cache = doer_cache
-            self.environment = environment
-            self.pattern = pattern
-
-        def run(self):
-            doers = []
-
-            for group in self.streams:
-                doer = Grouper(group, doer_cache, self.environment, self.pattern)
-                doers.append(doer)
-                doer.start()
-
-            for doer in doers:
-                doer.join()
-
+    def should_run(rebuild, item):
+        for forced in rebuild:
+            if item.startswith(forced):
+                return True
+        return False
 
     def do_work(environment, index, item):
          os.chdir(project_directory)
@@ -369,11 +353,10 @@ def main():
              last_successful = find_last_successful_build(builds)
 
              if manual:
-                for rebuild_item in args.rebuild:
-                    if item.startswith(rebuild_item):
-                        print("Skipping manual build {}".format(item))
-                        remove_from_running(item)
-                        return
+                if not should_run(args.rebuild, item):
+                    print("Skipping manual build {}".format(item))
+                    remove_from_running(item)
+                    return
 
              component_paths_script = os.path.join(provider, "component-paths")
              if not args.force and last_successful and os.path.isfile(component_paths_script):
@@ -469,9 +452,21 @@ def main():
                      artifact_test = client.run_command("test -f {}".format(last_artifact_name))
                      client.join(artifact_test)
                      if artifact_test[hosts]["exit_code"] != 0:
-                         print("Uploading {} to workers...".format(source_artifact))
-                         cmds = client.scp_send(source_artifact, last_artifact_name)
-                         joinall(cmds, raise_error=True)
+                            print("Uploading {} to workers...".format(source_artifact))
+                            rsync_command = "rsync -Pav -e \"ssh -i {}\" {} {}@{}:{}".format(
+                               args.workers_key[0],
+                               source_artifact,
+                               args.workers_user,
+                               hosts,
+                               last_artifact_name)
+                            print(rsync_command)
+                            rsync = Popen(["bash", "-c", rsync_command])
+                            rsync.communicate()
+
+
+
+                         #cmds = client.scp_send(source_artifact, last_artifact_name)
+                         #joinall(cmds, raise_error=True)
 
 
              if args.force_local == False and local == False and client != None:
@@ -541,7 +536,7 @@ def main():
         for component in components:
             state["components"].append({
                 "name": component,
-                "status": "green",
+                "status": "ready",
                 "command": "validate",
                 "environment": environment
             })
@@ -588,7 +583,14 @@ def main():
 
     @app.route('/json')
     def return_json():
+      for component in state["components"]:
+          component["status"] = "ready"
+
       for item in state["running"]:
+          for component in state["components"]:
+              if component["name"] in item["reference"]:
+                  component["status"] = "running"
+
           if "log_file" in item:
               item["current_size"] = os.stat(item["log_file"]).st_size
               if item["last_size"] != 0:
@@ -625,11 +627,29 @@ def main():
         print("Retrieving logs {}".format(component_reference))
         return Response(json.dumps(logs), content_type="application/json")
 
+    @app.route('/force-trigger', methods=["POST"])
+    def triggerForce():
+      data = request.get_json()
+      print("Triggering {}".format(data["name"]))
+      for component in state["components"]:
+          if component["name"] == data["name"]:
+              component["status"] = "queued"
+      environment = data["environment"]
+      provider, component, command, manual, local = parse_reference(data["name"] + "/run")
+      last_run_file = get_last_run_path(environment, provider, component, command)
+      if os.path.exists(last_run_file):
+          os.remove(last_run_file)
+      begin_pipeline(environment, streams, orderings, data["name"])
+      return Response(headers={'Content-Type': 'application/json'})
+
 
     @app.route('/trigger', methods=["POST"])
     def trigger():
       data = request.get_json()
       print("Triggering {}".format(data["name"]))
+      for component in state["components"]:
+          if component["name"] == data["name"]:
+              component["status"] = "queued"
       environment = data["environment"]
       begin_pipeline(environment, streams, orderings, data["name"])
       return Response(headers={'Content-Type': 'application/json'})
@@ -805,7 +825,7 @@ def main():
                 last_successful_build = find_last_successful_build(builds)
                 if last_successful_build:
                     try:
-                        last_logfile = "logs/{:03d}-{}-{}-{}-{}.log".format(last_successful_build["build_number"],
+                        last_logfile = "builds/logs/{:03d}-{}-{}-{}-{}.log".format(last_successful_build["build_number"],
                             environment,
                             provider, component,
                             command)
@@ -894,7 +914,7 @@ def main():
                 if test_exists[host]["exit_code"] == 0:
                     print("Running build remotely")
                     ran_remotely = True
-                    remote_log_filename = "logs/{}-{}.{}.{}.{}.log".format(build_number, environment, provider, component, command)
+                    remote_log_filename = "builds/logs/{}-{}.{}.{}.{}.log".format(build_number, environment, provider, component, command)
                     build_command = client.run_command("""set -a ;
                         source {} ;
                         export OUTPUT_PATH=$(readlink -f ${{OUTPUT_PATH}}) ;
@@ -922,7 +942,7 @@ def main():
                     return
                 if ran_remotely:
                     print("Setting up logs...")
-                    logfile = open("logs/{}-{}.{}.{}.{}.log".format(build_number, environment, provider, component, command), "w")
+                    logfile = open("builds/logs/{}-{}.{}.{}.{}.log".format(build_number, environment, provider, component, command), "w")
 
                     client.join(build_command)
                     for line in build_command[host]["stdout"]:
@@ -1022,7 +1042,7 @@ def main():
 
 
         provider, component, command, manual, local = parse_reference(dependency)
-        log_filename = "logs/{:03d}-{}-{}-{}-{}.log".format(build_number, environment, provider, component, command)
+        log_filename = "builds/logs/{:03d}-{}-{}-{}-{}.log".format(build_number, environment, provider, component, command)
         log_file = open(os.path.join(project_directory, log_filename), 'w')
         env = construct_environment(project_directory, build_number, environment, provider, component, command, previous_outputs)
         env["OUTPUT_PATH"] = os.path.abspath(env["OUTPUT_PATH"])
@@ -1043,7 +1063,7 @@ def main():
         last_successful_build = find_last_successful_build(builds)
         if last_successful_build:
             try:
-                last_logfile = "logs/{:03d}-{}-{}-{}-{}.log".format(last_successful_build["build_number"],
+                last_logfile = "builds/logs/{:03d}-{}-{}-{}-{}.log".format(last_successful_build["build_number"],
                     environment,
                     provider, component,
                     command)
@@ -1105,6 +1125,7 @@ def main():
                   extract_dependency.communicate()
 
               env["USER"] = getpass.getuser()
+              pprint(env)
               runner = Popen([command,
                  environment,
                  component], cwd=os.path.join(work_dir, provider), stdin=sys.stdin, stdout=log_file, stderr=log_file,
