@@ -294,7 +294,7 @@ def main():
                 if thread in self.threads:
                     self.threads[thread].join()
                     if not self.threads[thread].success:
-                        print("Aborting due to upstream error")
+                        print("Aborting due to upstream error (from {})".format(self.item))
                         return
 
             if matcher(self.item, self.pattern):
@@ -588,6 +588,7 @@ def main():
 
       for item in state["running"]:
           for component in state["components"]:
+
               if component["name"] in item["reference"]:
                   component["status"] = "running"
 
