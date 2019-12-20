@@ -64,7 +64,7 @@ You want to use Chef to install Java and create an AWS AMI from that cookbook an
 
 ![AMIPipeline](/docs/example-01.png)
 
-1. You have a Chef cookbook called ‘ubuntu-java’ that can install Java. You test with test kitchen.
+1. You have a Chef cookbook called ‘java’ that can install Java. You test with test kitchen.
 2. You have a packer template file called ‘ubuntu-java.json’.
 3. You have a terraform folder called ‘ubuntu-java’.
 
