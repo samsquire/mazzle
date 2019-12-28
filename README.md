@@ -11,7 +11,7 @@ This build tool builds infrastructure for environments on the fly. It is meant t
 
 ## pipelines as code - configure your data flow with dot syntax
 
-This tool executes a [dot syntax graph](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) of an entire environment. The following graph:
+This tool executes a [dot syntax graph](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) of an entire environment. The following graph: See this [devops-pipeline-starter](https://github.com/samsquire/devops-pipeline-starter) for the infrastructure code that builds this.
 
  * provisions two CI workers with Ansible - future steps are executed on these workers
  * installs kubernetes on these workers
