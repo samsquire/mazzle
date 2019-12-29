@@ -13,8 +13,8 @@ This build tool builds infrastructure for environments on the fly. It is meant t
 
 This tool executes a [dot syntax graph](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) of an entire environment. See the following graph for my project, [devops-pipeline-starter](https://github.com/samsquire/devops-pipeline-starter) for the infrastructure code that builds this.
 
- * provisions two CI workers with Ansible - future steps are executed on these workers
- * installs kubernetes on these workers
+ * provisions two CI workers with Ansible - future steps are executed on these workers, generates worker keys for logging into rest of architecture
+ * installs kubernetes, Consul
  * provisions 3 AMI builds  - base image, authenticated image and java image
  * Sets up Bastion servers with Terraform
  * Installs Prometheus and Grafana with Terraform
