@@ -102,7 +102,7 @@ Using fpm to package up nodejs, uploading it to a package repository and install
 
 ```
 digraph G {
-  "fpm/node" -> "shellscript/upload" -> "ansible/install"
+  "fpm/node*" -> "shellscript/upload" -> "ansible/install"
 }
 ```
 
