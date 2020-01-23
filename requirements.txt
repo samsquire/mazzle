@@ -4,11 +4,6 @@ psutil
 networkx
 boto3
 ansible
-flask-socketio
-eventlet
-python-socketio
-SQLAlchemy
 ortools
 parallel-ssh
 pydot
-boto
