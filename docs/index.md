@@ -141,7 +141,7 @@ cd devops-pipeline
 ./install.sh  # adds devops-pipeline to your path via /etc/profile.d/devops-pipeline.sh
 sudo apt-get install python3-pip
 pip3 install -r requirements.txt
-
+cd devops_pipeline/web ; npm build
 ```
 2. Logout and log back in
 
