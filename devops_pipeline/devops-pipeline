@@ -588,8 +588,9 @@ def main():
 
       for item in state["running"]:
           for component in state["components"]:
-
-              if component["name"] in item["reference"]:
+              provider, running_component, command, manual, local = parse_reference(item["reference"])
+              component_provider, component_name = component["name"].split("/")
+              if component_provider == provider and running_component == component_name:
                   component["status"] = "running"
 
           if "log_file" in item:
@@ -1121,6 +1122,8 @@ def main():
               print("Running require")
               chosen_file = run_require(work_dir, environment, provider, component, command)
               if chosen_file:
+                  print(chosen_file)
+                  print("Copying required file...")
                   copy(chosen_file, os.path.join(work_dir))
                   extract_dependency = Popen(["tar", "xf", os.path.join(work_dir, os.path.basename(chosen_file)), "-C", work_dir])
                   extract_dependency.communicate()
@@ -1305,7 +1308,7 @@ def main():
         "status": "ready",
         "facts": "{} tasks, {} components"
             .format(len(streams),
-            len(state["components"]))
+            len(list(filter(lambda x : x["environment"] == environment, state["components"]))))
       })
 
       # find running processes from last run
