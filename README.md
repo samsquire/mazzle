@@ -111,7 +111,7 @@ digraph G {
 
 This tool sees infrastructure code in a certain way. Each run of a tool is a `component`. Components have names. Example components:
 
- * **ansible/provision-machines** could be a ansible role that runs configuration management
+ * **ansible/provision-machines** could be a ansible playbook to provision machines in the cloud
  * **packer/source-ami** could be a component that configures a base image for AWS
  * **packer/developer-box** could be a component that configures a base machine for developers
  * **shellscript/init-vault** could be shell scripts to glue together various things
