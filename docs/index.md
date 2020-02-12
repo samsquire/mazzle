@@ -183,7 +183,7 @@ The `OUTPUT_PATH` is an absolute path to a file that you should write outputs as
 
 ARTIFACT_PATH is a path that you should save an archive of parts of your working directory to be `require`d from another pipeline.
 
-Each time `devops-pipeline` runs a pipeline, it passes outputs of all downstream variables to to your pipeline command as environment variables.
+Each time `devops-pipeline` runs a pipeline, it passes outputs of all upstream variables to to your pipeline command as environment variables.
 
 # depending on artifacts
 
