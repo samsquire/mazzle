@@ -135,6 +135,15 @@ digraph G {
 
 1. Ubuntu
 
+Install ansible
+
+```
+sudo apt update
+$ sudo apt install software-properties-common
+$ sudo apt-add-repository --yes --update ppa:ansible/ansible
+$ sudo apt install ansible
+```
+
 Install terraform with plugins
 
 ```
