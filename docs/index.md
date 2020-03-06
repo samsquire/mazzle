@@ -168,6 +168,13 @@ sudo apt-get install python3-pip
 pip3 install -r requirements.txt
 cd devops_pipeline/web ; npm build
 ```
+
+Create a GPG key
+
+```
+gpg --full-generate-key
+```
+
 2. Logout and log back in
 
 ```
