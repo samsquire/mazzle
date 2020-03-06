@@ -151,6 +151,15 @@ unzip terraform_0.12.23_linux_amd64.zip
 sudo mv terraform /usr/local/bin
 ```
 
+Install packer
+
+```
+wget https://releases.hashicorp.com/packer/1.5.4/packer_1.5.4_linux_amd64.zip
+unzip packer_1.5.4_linux_amd64.zip
+sudo mv packer /usr/local/bin
+
+```
+
 ```
 git clone git@github.com:samsquire/devops-pipeline.git
 cd devops-pipeline
