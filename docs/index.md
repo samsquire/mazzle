@@ -147,29 +147,6 @@ sudo apt install ansible
 Install terraform with plugins
 
 ```
-mkdir -p ~/.terraform.d/plugins
-wget https://releases.hashicorp.com/terraform-provider-template/2.1.2/terraform-provider-template_2.1.2_linux_amd64.zip
-unzip terraform-provider-template_2.1.2_linux_amd64.zip
-mv terraform-provider-template_v2.1.2_x4 ~/.terraform.d/plugins
-
-wget https://releases.hashicorp.com/terraform-provider-aws/2.51.0/terraform-provider-aws_2.51.0_linux_amd64.zip
-unzip terraform-provider-aws_2.51.0_linux_amd64.zip 
-mv terraform-provider-aws_v2.51.0_x4 ~/.terraform.d/plugins/
-wget https://releases.hashicorp.com/terraform/0.12.23/terraform_0.12.23_linux_amd64.zip
-unzip terraform_0.12.23_linux_amd64.zip
-sudo mv terraform /usr/local/bin
-```
-
-Install packer
-
-```
-wget https://releases.hashicorp.com/packer/1.5.4/packer_1.5.4_linux_amd64.zip
-unzip packer_1.5.4_linux_amd64.zip
-sudo mv packer /usr/local/bin
-
-```
-
-```
 git clone git@github.com:samsquire/devops-pipeline.git
 cd devops-pipeline
 ./install.sh  # adds devops-pipeline to your path via /etc/profile.d/devops-pipeline.sh
@@ -199,7 +176,7 @@ AWS_SECRET_ACCESS_KEY=
 
 3. Take a look around the demo project, which brings up 7 nodes in AWS. See architecture.dot to see how it fits together.
 
-4. Update `common.tfvars` to include your key name, IP address. Bring up demo project (this will cost money)
+4. Update `common.tfvars` to include your key name, key path, IP address. Bring up demo project (this will cost money)
 
 ```
 devops-pipeline home \
