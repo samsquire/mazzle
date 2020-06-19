@@ -185,8 +185,14 @@ devops-pipeline home \
 	   --discover-workers-from-output workers \
 	   --workers-key <path to ssh private key> \
 	   --workers-user ubuntu \
-	   --keys <gpg key email>
+	   --keys <gpg key email> \
+	   --rebuild 'packer/source-ami*' 'packer/authenticated-ami*' 'packer/vault-ami*' 'packer/ubuntu-java*'
+
 ```
+
+Go to http://localhost:5000.
+Click switch to environment under home and click 'Run pipeline'.
+Check build/logs/* for errors
 
 
 # passing data along a pipeline
