@@ -7,7 +7,9 @@ import getpass
 from functools import partial
 from flask import Flask, render_template, Response
 from flask_socketio import SocketIO
+from flask_cors import CORS
 app = Flask(__name__)
+CORS(app)
 app.config['SECRET_KEY'] = 'secret!'
 
 import os
@@ -63,9 +65,27 @@ state = {
 }
 
 def remove_from_running(reference):
+  provider_name, component_name, command_name, manual, local_build = parse_reference(reference)
   for item in state["running"]:
       if item["reference"] == reference:
         state["running"].remove(item)
+
+        for latest in state["latest"]:
+            if latest["name"] == "{}/{}".format(provider_name, component_name):
+                for command in latest["commands"]:
+                    if command["name"] == command_name:
+                        command["status"] = "ready"
+                        command["progress"] = 100
+
+def mark_dependency_as_running(reference):
+    provider_name, component_name, command_name, manual, local_build = parse_reference(reference)
+
+    for item in state["latest"]:
+
+        if item["name"] == "{}/{}".format(provider_name, component_name):
+            for command in item["commands"]:
+                if command["name"] == command_name:
+                    command["status"] = "running"
 
 def parse_reference(reference):
   full_provider, component_name, command = reference.split("/")
@@ -587,8 +607,9 @@ def main():
           component["status"] = "ready"
 
       for item in state["running"]:
+          provider, running_component, command, manual, local = parse_reference(item["reference"])
           for component in state["components"]:
-              provider, running_component, command, manual, local = parse_reference(item["reference"])
+
               component_provider, component_name = component["name"].split("/")
               if component_provider == provider and running_component == component_name:
                   component["status"] = "running"
@@ -597,6 +618,13 @@ def main():
               item["current_size"] = os.stat(item["log_file"]).st_size
               if item["last_size"] != 0:
                   item["progress"] = (item["current_size"] / item["last_size"]) * 100
+                  for latest in state["latest"]:
+                      if latest["name"] == "{}/{}".format(provider, running_component):
+                          for current_command in latest["commands"]:
+                              if current_command["name"] == command:
+                                  current_command["progress"] = item["progress"]
+
+
       state["running"] = sorted(state["running"], key=lambda item: item["reference"])
 
       for component_data in state["latest"]:
@@ -608,6 +636,15 @@ def main():
               if builds:
                   current_build = builds[-1]
                   command_data["build_number"] = current_build["build_number"]
+                  command_data["build_success"] = "success" if last_build_status else "failure"
+                  if not command_data.get("progress"):
+                      command_data["progress"] = 100
+
+      q = request.args.get("q") or ""
+      state["searchResults"] = {
+        "environments": list(map(lambda x: x["name"], filter(lambda x: x["name"].startswith(q), state["environments"]))),
+        "components": list(map(lambda x: x, filter(lambda x: x["name"].startswith(q), state["components"])))
+      }
 
       return Response(json.dumps(state), content_type="application/json")
 
@@ -821,6 +858,7 @@ def main():
                     "status": "running"
                 }
                 state["running"].append(this_build)
+                mark_dependency_as_running(dependency)
                 build_data["builds"].append(this_build)
                 write_builds_file(builds_filename, build_data)
                 lock.release()
@@ -1062,6 +1100,7 @@ def main():
             "status": "running"
         }
         state["running"].append(this_build)
+        mark_dependency_as_running(dependency)
         last_successful_build = find_last_successful_build(builds)
         if last_successful_build:
             try:
@@ -1074,7 +1113,7 @@ def main():
                 this_build["last_size"] = last_size
                 this_build["log_file"] = log_filename
             except Exception as e:
-                pass
+                print(e)
         build_data["builds"].append(this_build)
         write_builds_file(builds_filename, build_data)
         lock.release()
@@ -1326,7 +1365,7 @@ def main():
 
 
     if args.gui:
-        app.run()
+        app.run(host= '0.0.0.0')
     else:
         pass #for environment in ordered_environments:
             #begin_pipeline(environment, run_groups, "")
