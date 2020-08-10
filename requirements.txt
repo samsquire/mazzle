@@ -7,3 +7,5 @@ ansible
 ortools
 parallel-ssh
 pydot
+flask_socketio
+flask-cors
