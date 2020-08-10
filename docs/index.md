@@ -1,4 +1,4 @@
-# introducing devops-pipeline
+# introducing devops-pipeline - a devops pipelines as code tool
 
 This is a prototype. YMMV
 
@@ -19,6 +19,8 @@ Write self-descriptive pipelines in dot syntax renderable by graphviz and execut
 This pipeline is fairly complicated environment that brings up two worker nodes with Ansible and provisions Hashicorp Vault with Terraform. Notice how some components such as dns, security, vault volume can all begin running at the same time as they are independent.
 
 ![pipeline-running](parallel-components.png)
+
+![pipeline view](pipeline-view.png)
 
 ![log history](command-view-buckets.png)
 
