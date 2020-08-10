@@ -158,7 +158,7 @@ cd devops-pipeline
 ./install.sh  # adds devops-pipeline to your path via /etc/profile.d/devops-pipeline.sh
 sudo apt-get install python3-pip
 pip3 install -r requirements.txt
-cd devops_pipeline/web ; npm build
+cd devops_pipeline/web ; npm install ; npm build
 ```
 
 Create a GPG key
