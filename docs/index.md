@@ -20,7 +20,7 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
 
 ![pipeline-running](parallel-components.png)
 
-![pipeline view](pipeline-view.png)
+![pipeline view](pipeline_view.png)
 
 ![log history](command-view-buckets.png)
 
