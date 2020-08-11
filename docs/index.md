@@ -39,6 +39,7 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
 * **Secret handling** Encrypts sensitive outputs at rest with your GPG keys.
 * **Progress bars** Devops-pipeline uses log size to calculate progress bars as a rough approximation of completedness.
 * **Fire and forget builds** When devops-pipeline runs a project, it packages it for running in a different working directory. This means you can continue to make changes to your source tree without impacting the running build.
+* **Search** Search for components and environments.
 
 # introduction
 
