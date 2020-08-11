@@ -44,9 +44,7 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
 
 # how it works
 
-devops-pipeline understands .dot files and interprets them to work out what must be done. All devops-pipeline does is walk the directories mentioned by your dot file and run a script inside each folder called "run". This is where you define what should happen for that stage of the pipeline. This is what gives devops-pipeline the flexibility to run any devops tool.
-
-# structuring your code as a monorepository
+devops-pipeline understands .dot files and interprets them to work out what must be done. All devops-pipeline does is walk the directories mentioned by your dot file and run a script inside each folder, named after the lifecycle stage. This is where you define what should happen for that stage of the pipeline. This is what gives devops-pipeline the flexibility to run any devops tool.
 
 Your code is separated by directory by each tool. Like a **monorepository**, you divide your code by tool, so you have a directory for ansible code, a directory for terraform code. Devops-pipeline loops through these directories and runs a lifecycle command that you have in each code directory.
 
