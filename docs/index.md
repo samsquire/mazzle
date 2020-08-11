@@ -60,9 +60,9 @@ chef/
 
 Devops-pipeline will cd to these directories and run a lifecycle command, which could be one of the following:
 
-* ansible/validate
-* ansible/run
-* ansible/test
+* ansible/validate -> ansible/run -> ansible/test
+* shellscript/validate -> shellscript/run -> shellscript/test
+* terraform/validate -> terraform/run -> terraform/test
 
 # SSH workers
 
