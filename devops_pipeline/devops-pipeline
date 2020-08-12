@@ -35,6 +35,7 @@ sys.path.append(dir_path)
 from sys import stdout
 from pprint import pprint
 from subprocess import Popen, PIPE, run, call
+import time
 
 lock = Lock()
 run_groups = []
@@ -43,46 +44,56 @@ job_monitors = {}
 stream_workers = []
 doer_cache = {}
 state = {
+"notifications": [],
 "environments": [
 ],
 "components": [],
 "pipeline": [],
 "running": [],
-"latest": [{
-"name": "terraform/vpc",
-"commands": [
-    {"name": 'validate', "buildIdentifier": '21', "progress": 100},
-    {"name": 'test', "buildIdentifier": '21', "progress": 100},
-    {"name": 'package', "buildIdentifier": '21', "progress": 60},
-    {"name": 'plan', "buildIdentifier": '21', "progress": 0},
-    {"name": 'run', "buildIdentifier": '21', "progress": 0},
-    {"name": 'deploy', "buildIdentifier": '21', "progress": 0},
-    {"name": 'release', "buildIdentifier": '21', "progress": 0},
-    {"name": 'smoke', "buildIdentifier": '21', "progress": 0}
-    ]
-}],
+"latest": [
+# {
+# "name": "terraform/vpc",
+# "commands": [
+#     {"name": 'validate', "buildIdentifier": '21', "progress": 100},
+#     {"name": 'test', "buildIdentifier": '21', "progress": 100},
+#     {"name": 'package', "buildIdentifier": '21', "progress": 60},
+#     {"name": 'plan', "buildIdentifier": '21', "progress": 0},
+#     {"name": 'run', "buildIdentifier": '21', "progress": 0},
+#     {"name": 'deploy', "buildIdentifier": '21', "progress": 0},
+#     {"name": 'release', "buildIdentifier": '21', "progress": 0},
+#     {"name": 'smoke', "buildIdentifier": '21', "progress": 0}
+#     ]
+#
+# }
+],
 "filtering": ""
 }
+last_q = {
+    "q": None
+}
+searchResults = {
+    "environments": [],
+    "components": []
+}
 
-def remove_from_running(reference):
+def remove_from_running(reference, environment):
   provider_name, component_name, command_name, manual, local_build = parse_reference(reference)
   for item in state["running"]:
-      if item["reference"] == reference:
+      if item["environment"] == environment and item["reference"] == reference:
         state["running"].remove(item)
 
         for latest in state["latest"]:
-            if latest["name"] == "{}/{}".format(provider_name, component_name):
+            if latest["environment"] == environment and latest["name"] == "{}/{}".format(provider_name, component_name):
                 for command in latest["commands"]:
                     if command["name"] == command_name:
                         command["status"] = "ready"
                         command["progress"] = 100
 
-def mark_dependency_as_running(reference):
+def mark_dependency_as_running(reference, environment):
     provider_name, component_name, command_name, manual, local_build = parse_reference(reference)
 
     for item in state["latest"]:
-
-        if item["name"] == "{}/{}".format(provider_name, component_name):
+        if item["environment"] == environment and item["name"] == "{}/{}".format(provider_name, component_name):
             for command in item["commands"]:
                 if command["name"] == command_name:
                     command["status"] = "running"
@@ -249,7 +260,7 @@ class Component():
                 build["status"] = "unknown"
 
 
-        remove_from_running(self.reference)
+        remove_from_running(self.reference, self.environment)
         lock.acquire()
         builds_filename = get_builds_filename(self.environment, self.provider, self.component, self.command)
         write_builds_file(builds_filename, {"builds": builds})
@@ -298,7 +309,7 @@ def main():
 
 
     class Doer(Thread):
-        def __init__(self, component, index, threads, environment, pattern):
+        def __init__(self, component, index, threads, environment, pattern, trigger_all):
             super(Doer, self).__init__()
             self.component = component
             self.item = component["name"]
@@ -308,6 +319,7 @@ def main():
             self.pattern = pattern
             self.error = False
             self.success = False
+            self.trigger_all = trigger_all
 
         def run(self):
             for thread in self.component["ancestors"]:
@@ -319,7 +331,7 @@ def main():
 
             if matcher(self.item, self.pattern):
                 print("Running {}".format(self.item))
-                handle = do_work(self.environment, self.index, self.item)
+                handle = do_work(self.environment, self.index, self.item, self.trigger_all)
 
                 if handle:
                     handle.join()
@@ -329,12 +341,13 @@ def main():
 
 
     class Grouper(Thread):
-        def __init__(self, run_groups, doer_cache, environment, pattern):
+        def __init__(self, run_groups, doer_cache, environment, pattern, trigger_all):
             super(Grouper, self).__init__()
             self.run_groups = run_groups
             self.doer_cache = doer_cache
             self.environment = environment
             self.pattern = pattern
+            self.trigger_all = trigger_all
 
 
         def run(self):
@@ -344,7 +357,7 @@ def main():
                     doer_cache[group].join()
                 else:
                     print("Group", group)
-                    doer = Doer(group, index, doer_cache, self.environment, self.pattern)
+                    doer = Doer(group, index, doer_cache, self.environment, self.pattern, self.trigger_all)
                     doer_cache[group] = doer
                     doers.append(doer)
                     doer.start()
@@ -358,11 +371,15 @@ def main():
                 return True
         return False
 
-    def do_work(environment, index, item):
+    def do_work(environment, index, item, trigger_all):
          os.chdir(project_directory)
          if args.only and item not in args.only:
              print("Skipping {}".format(item))
              return
+
+         provider, component, command, manual, local = parse_reference(item)
+         if command == "package" and ordered_environments.index(environment) > 0:
+             print("Skipping package step")
 
 
          if not is_running(item):
@@ -375,11 +392,11 @@ def main():
              if manual:
                 if not should_run(args.rebuild, item):
                     print("Skipping manual build {}".format(item))
-                    remove_from_running(item)
+                    remove_from_running(item, environment)
                     return
 
              component_paths_script = os.path.join(provider, "component-paths")
-             if not args.force and last_successful and os.path.isfile(component_paths_script):
+             if not trigger_all and not args.force and last_successful and os.path.isfile(component_paths_script):
 
                 component_paths_output = run(["./component-paths", environment, component],
                     cwd=os.path.join(project_directory, provider), stdout=PIPE).stdout.decode('utf-8').strip()
@@ -398,6 +415,12 @@ def main():
                     print(changed_files)
                     if global_commands.index(command) != 0 and len(changed_files) == 0:
                         print("Component {}/{} is up-to-date".format(component, command))
+                        state["notifications"].insert(0, {
+                            "variant": "success",
+                            "id": time.time(),
+                            "title": "{}/{}".format(component, command),
+                            "text": "Component is already up-to-date."
+                        })
                         return
 
 
@@ -434,9 +457,18 @@ def main():
 
              else:
                  # unpack last artifacts
+                 environment_position = ordered_environments.index(environment)
+                 last_environment = environment_position - 1
+                 artifact_environment = environment
+                 use_previous_environment_package = False
+                 if last_environment >= 0:
+                     artifact_environment = ordered_environments[0]
+                     print("Artifact environment for {} is {}".format(environment, artifact_environment))
+                     use_previous_environment_package = True
+
 
                  parent_command = "package"
-                 parent_builds, last_build_status, _ = get_builds(environment, provider, component, parent_command)
+                 parent_builds, last_build_status, _ = get_builds(artifact_environment, provider, component, parent_command)
                  last_successful_build = find_last_successful_build(parent_builds)
                  if not last_successful_build:
                     return
@@ -444,10 +476,11 @@ def main():
 
                  artifacts_path = os.path.abspath("builds/artifacts")
                  last_successful_build_number = last_successful_build["build_number"]
-                 last_artifact_name = "{}.{}.{}.{}.tgz".format(environment, provider, component, last_successful_build_number)
+
+                 last_artifact_name = "{}.{}.{}.{}.tgz".format(artifact_environment, provider, component, last_successful_build_number)
                  source_artifact = os.path.abspath(os.path.join("builds/artifacts", last_artifact_name))
 
-                 print("Last artifact name {}".format(last_artifact_name))
+                 print("Last artifact name {} used for {}".format(last_artifact_name, environment))
                  work_dir_name = "{}_{}_{}_{}_{}".format(environment, provider, component, command, next_build)
                  work_dir_path = os.path.abspath(os.path.join("builds/work", work_dir_name))
                  if not os.path.isdir(work_dir_path):
@@ -552,7 +585,8 @@ def main():
 
     events = []
 
-    for environment in ordered_environments:
+
+    for index, environment in enumerate(ordered_environments):
         for component in components:
             state["components"].append({
                 "name": component,
@@ -567,6 +601,8 @@ def main():
             }
             state["latest"].append(latest)
             for command in global_commands:
+                if index > 0 and command == "package":
+                    continue # skip packaging for later environments
                 latest["commands"].append({
                     "name": command,
                     "environment": environment,
@@ -603,23 +639,34 @@ def main():
 
     @app.route('/json')
     def return_json():
+      for environment in state["environments"]:
+          environment["status"] = "ready"
+
       for component in state["components"]:
           component["status"] = "ready"
 
       for item in state["running"]:
           provider, running_component, command, manual, local = parse_reference(item["reference"])
-          for component in state["components"]:
 
-              component_provider, component_name = component["name"].split("/")
-              if component_provider == provider and running_component == component_name:
-                  component["status"] = "running"
 
           if "log_file" in item:
               item["current_size"] = os.stat(item["log_file"]).st_size
               if item["last_size"] != 0:
                   item["progress"] = (item["current_size"] / item["last_size"]) * 100
+
+                  for environment in state["environments"]:
+                      if item["environment"] == environment["name"]:
+                          environment["status"] = "running"
+
+                  for component in state["components"]:
+
+                      component_provider, component_name = component["name"].split("/")
+                      if item["environment"] == component["environment"] and component_provider == provider and running_component == component_name:
+                          component["status"] = "running"
+                          component["progress"] = item["progress"]
+
                   for latest in state["latest"]:
-                      if latest["name"] == "{}/{}".format(provider, running_component):
+                      if latest["environment"] == item["environment"] and latest["name"] == "{}/{}".format(provider, running_component):
                           for current_command in latest["commands"]:
                               if current_command["name"] == command:
                                   current_command["progress"] = item["progress"]
@@ -631,7 +678,7 @@ def main():
           provider, component = component_data["name"].split("/")
           for command_data in component_data["commands"]:
               command = command_data["name"]
-              builds, last_build_status, next_build = get_builds(args.environment, provider, component, command)
+              builds, last_build_status, next_build = get_builds(component_data["environment"], provider, component, command)
 
               if builds:
                   current_build = builds[-1]
@@ -641,10 +688,12 @@ def main():
                       command_data["progress"] = 100
 
       q = request.args.get("q") or ""
-      state["searchResults"] = {
-        "environments": list(map(lambda x: x["name"], filter(lambda x: x["name"].startswith(q), state["environments"]))),
-        "components": list(map(lambda x: x, filter(lambda x: x["name"].startswith(q), state["components"])))
-      }
+      if q != last_q["q"]:
+          state["searchResults"] = {
+            "environments": list(map(lambda x: x["name"], filter(lambda x: q in x["name"], state["environments"]))),
+            "components": list(map(lambda x: x, filter(lambda x: q in x["name"], state["components"])))
+          }
+          last_q["q"] = q
 
       return Response(json.dumps(state), content_type="application/json")
 
@@ -690,7 +739,10 @@ def main():
           if component["name"] == data["name"]:
               component["status"] = "queued"
       environment = data["environment"]
-      begin_pipeline(environment, streams, orderings, data["name"])
+      trigger_all = data.get("force", False)
+      if trigger_all:
+          print("Build is forced")
+      begin_pipeline(environment, streams, orderings, data["name"], trigger_all=trigger_all)
       return Response(headers={'Content-Type': 'application/json'})
 
     @app.route('/propagate', methods=["POST"])
@@ -720,7 +772,8 @@ def main():
     def triggerEnvironment():
       data = request.get_json()
       pprint(data)
-      begin_pipeline(data["environment"], streams, orderings, "")
+      trigger_all = data["forced"]
+      begin_pipeline(data["environment"], streams, orderings, "", trigger_all=trigger_all)
       return Response(headers={'Content-Type': 'application/json'})
 
     @app.route('/running')
@@ -855,10 +908,11 @@ def main():
                     "remote": True,
                     "build_number": build_number,
                     "reference": dependency,
-                    "status": "running"
+                    "status": "running",
+                    "environment": environment
                 }
                 state["running"].append(this_build)
-                mark_dependency_as_running(dependency)
+                mark_dependency_as_running(dependency, environment)
                 build_data["builds"].append(this_build)
                 write_builds_file(builds_filename, build_data)
                 lock.release()
@@ -977,7 +1031,7 @@ def main():
                         .format(environment, provider, component, command)), 'w').write("{}")
                     write_builds_file(builds_filename, build_data)
                     lock.release()
-                    remove_from_running(dependency)
+                    remove_from_running(dependency, environment)
                     open(os.path.join(get_last_run_path(environment, provider, component, command)), 'w').write(':)')
                     return
                 if ran_remotely:
@@ -990,7 +1044,7 @@ def main():
                     for line in build_command[host]["stderr"]:
                         logfile.write(line + "\n")
                     print("Remote build finished")
-                    remove_from_running(dependency)
+                    remove_from_running(dependency, environment)
 
                     print("Downloading outputs...")
                     dest_output = os.path.join(project_directory, "builds/outputs/{}.{}.{}.{}.outputs.json".format(environment, provider, component, command))
@@ -1097,10 +1151,11 @@ def main():
             "success": False,
             "build_number": build_number,
             "reference": dependency,
-            "status": "running"
+            "status": "running",
+            "environment": environment
         }
         state["running"].append(this_build)
-        mark_dependency_as_running(dependency)
+        mark_dependency_as_running(dependency, environment)
         last_successful_build = find_last_successful_build(builds)
         if last_successful_build:
             try:
@@ -1145,7 +1200,7 @@ def main():
                 lock.acquire()
                 open("builds/outputs/{}-{}-{}.json".format(provider, component, command), 'w').write("{}")
                 write_builds_file(builds_filename, build_data)
-                remove_from_running(dependency)
+                remove_from_running(dependency, environment)
                 lock.release()
                 open(os.path.join(get_last_run_path(environment, provider, component, command)), 'w').write(':)')
                 return
@@ -1289,16 +1344,22 @@ def main():
 
 
 
-    def begin_pipeline(environment, streams, orderings, pattern):
+    def begin_pipeline(environment, streams, orderings, pattern, trigger_all=False):
         class Streams(Thread):
+            def __init__(self, environment, trigger_all):
+                super(Streams, self).__init__()
+                self.environment = environment
+                self.trigger_all = trigger_all
+
             def run(self):
 
                 threads = {}
 
                 for index, component in enumerate(streams):
                     # component, index, threads, environment, pattern
+
                     if matcher(component["name"], pattern):
-                        new_thread = Doer(component, index, threads, environment, pattern)
+                        new_thread = Doer(component, index, threads, self.environment, pattern, self.trigger_all)
                         threads[component["name"]] = new_thread
 
                 for index in sorted(orderings):
@@ -1306,7 +1367,19 @@ def main():
                         if matcher(component, pattern):
                             threads[component].start()
 
-        stream_run = Streams()
+                # Wait for workers to finish
+                for thread in threads.values():
+                    thread.join()
+
+                # environment has finished, start the next environment
+                current_environment = ordered_environments.index(self.environment)
+                next_environment = current_environment + 1
+                if len(ordered_environments) > next_environment:
+                    stream_run = Streams(ordered_environments[next_environment], self.trigger_all)
+                    stream_run.start()
+
+
+        stream_run = Streams(environment, trigger_all)
         stream_run.start()
 
 
@@ -1332,6 +1405,8 @@ def main():
 
     loaded_json_file = open("builds/loaded.json", "w")
     loaded_json_file.write(json.dumps(loaded_components, indent=4))
+    loaded_json_file.flush()
+    loaded_json_file.close()
 
     pprint(streams)
     stream_file = open("builds/run_groups", "w")
