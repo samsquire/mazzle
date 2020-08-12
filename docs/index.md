@@ -18,6 +18,15 @@ Write self-descriptive pipelines in dot syntax renderable by graphviz and execut
 
 This pipeline is fairly complicated environment that brings up two worker nodes with Ansible and provisions Hashicorp Vault with Terraform. Notice how some components such as dns, security, vault volume can all begin running at the same time as they are independent.
 
+* Debian package repository server
+* 2 CI build machines
+* Prometheus instance for monitoring, monitoring via DNS
+* Node exporter installed on base AMI
+* Hashicorp Vault with Self signed Certificate authority for TLS
+* bastion
+* Kubernetes clustering
+* Consul clustering
+
 ![pipeline-running](parallel-components.png)
 
 ![pipeline view](pipeline_view.png)
