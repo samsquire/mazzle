@@ -1,4 +1,4 @@
-# introducing devops-pipeline - a devops pipelines as code tool
+# introducing devops-pipeline - a pipelines as code tool
 
 This is a prototype. YMMV
 
@@ -211,8 +211,7 @@ devops-pipeline home \
 ```
 
 Go to http://localhost:5000.
-Click switch to environment under home and click 'Run pipeline'.
-Check build/logs/* for errors
+Click switch to environment under home.
 
 
 # passing data along a pipeline
