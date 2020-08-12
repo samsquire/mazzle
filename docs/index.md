@@ -40,6 +40,7 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
 * **Progress bars** Devops-pipeline uses log size to calculate progress bars as a rough approximation of completedness.
 * **Fire and forget builds** When devops-pipeline runs a project, it packages it for running in a different working directory. This means you can continue to make changes to your source tree without impacting the running build.
 * **Search** Search for components and environments.
+* **Automatic pipeline of variables** Devops-pipeline accumulates variables from outputs at different steps in your pipeline, so you never have to worry about if a a variable is in scope or not. As long as your step is downstream from another in the dot file, you'll be able to see the outputs at all levels above.
 
 # introduction
 
