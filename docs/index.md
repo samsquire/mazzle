@@ -24,7 +24,7 @@ This pipeline is fairly complicated environment that brings up two worker nodes 
 
 ![notifications](notifications.png)
 
-![log history](command-view-buckets.png)
+![log history](command-view.png)
 
 ![environments view](environments-view.png)
 
