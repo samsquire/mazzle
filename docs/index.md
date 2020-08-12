@@ -218,6 +218,20 @@ ARTIFACT_PATH is a path that you should save an archive of parts of your working
 
 Each time `devops-pipeline` runs a pipeline, it passes outputs of all upstream variables to to your pipeline command as environment variables.
 
+# the builds directory
+
+![builds-directory](builds-directory.png)
+
+The builds directory is where logs and other outputs go:
+
+* **outputs** output files that are aggregated
+* **work** workspaces for builds, it's where the packaged repositories are unpacked
+* **last_runs** a file to mark a run which is used to detect changes since the last run
+* **history** a metadata file for each build, used to keep track of PIDs
+* **exits** exit codes for each build
+* **environments** environment files in json for each build
+* **ens** environment files in bash
+
 # depending on artifacts
 
 To depend on an artifact, such as an archived workspace from a previous build (see ARTIFACT_PATH above) create a file called `require` in your root of a provider directory. It should contain the name of the pipeline to pull artifacts from and the words `latest` or `latestSuccessful`. Latest means the last created artifact and latestSuccessful means the last artifact that was a succeeding build.
