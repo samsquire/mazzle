@@ -1,4 +1,4 @@
-# devops-pipeline
+# mazzle
 
 **Prototype code** This is prototype code YMMV very much still in development
 
@@ -11,7 +11,7 @@ This build tool builds infrastructure for environments on the fly. It is meant t
 
 ## pipelines as code - configure your data flow with dot syntax
 
-This tool executes a [dot syntax graph](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) of an entire environment. See the following graph for my project, [devops-pipeline-starter](https://github.com/samsquire/devops-pipeline-starter) for the infrastructure code that builds this.
+This tool executes a [dot syntax graph](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) of an entire environment. See the following graph for my project, [mazzle-starter](https://github.com/samsquire/mazzle-starter) for the infrastructure code that builds this.
 
  * provisions two CI workers with Ansible - future steps are executed on these workers, generates worker keys for logging into rest of architecture
  * installs kubernetes, Consul
@@ -48,7 +48,7 @@ Show a `command` with log file output.
 
 # performance optimisations
 
-`devops-pipeline` is meant to be ran after each and every change to your infrastructure code. You should be able to change any two parts of your infrastructure - at any layer - and test those changes together. It is meant to be used to trigger unit testing of all parts of your pipeline impacted by your changes. If you make a change early in your pipeline, you should be able to trigger tests underneath that point onwards to see if you have broken any thing. devops-pipeline uses some performance optimizations to be cheap to run:
+`mazzle` is meant to be ran after each and every change to your infrastructure code. You should be able to change any two parts of your infrastructure - at any layer - and test those changes together. It is meant to be used to trigger unit testing of all parts of your pipeline impacted by your changes. If you make a change early in your pipeline, you should be able to trigger tests underneath that point onwards to see if you have broken any thing. mazzle uses some performance optimizations to be cheap to run:
 
  * It calculates and runs in parallel what parts of your environment are safe to run at the same time where there are no data dependencies.
  * It detects if infrastructure directories have been changed and whether or not it needs to be reran.
@@ -120,23 +120,23 @@ This tool sees infrastructure code in a certain way. Each run of a tool is a `co
 
 # Introduction
 
-devops-pipeline is a command line tool with a GUI to coordinate bringing up environments and running a chain of different devops tools.
+mazzle is a command line tool with a GUI to coordinate bringing up environments and running a chain of different devops tools.
 
-* devops-pipeline coordinates other tools like Terraform, Ansible, Chef, shell scripts
+* mazzle coordinates other tools like Terraform, Ansible, Chef, shell scripts
 * To configure, you write a `dot` file explaining the relationships and data flow between each tool.
 * **Data is shared between tools as environment variables**
 * You specify the order of what tools are needed to be used to bring up an entire environment. Each person on your team could have an entire environment for themselves without trampling on each other's changes.
-* devops-pipeline runs all components with the same lifecycle of packaging, validation, running, testing
+* mazzle runs all components with the same lifecycle of packaging, validation, running, testing
 * Environment variables are how data is shared between tools.
-* devops-pipeline is meant to be cheap to run; you run it after making a change. It works out what needs to rerun.
+* mazzle is meant to be cheap to run; you run it after making a change. It works out what needs to rerun.
 
 # Installation
 
-See [devops-pipeline.com](http://devops-pipeline.com)
+See [mazzle.com](http://mazzle.com)
 
 # Worker support
 
-devops-pipeline can trigger builds on remote instances with SSH.
+mazzle can trigger builds on remote instances with SSH.
 
 `--discover-workers-from-output` looks for a space separated output with this name and uses the hostnames or IP addresses to SSH onto and run builds.
 
@@ -165,14 +165,14 @@ python3 ~/projects/devops_pipeline/devops_pipeline/pipeline.py \
 
 # command handlers
 
-`devops-pipeline` runs commands against components in a predefined order. This is the lifecycle of commands for each component:
+`mazzle` runs commands against components in a predefined order. This is the lifecycle of commands for each component:
 
 * **package** packaging happens first **on the master** to package code for workers
 * **validate** runs syntax checkers
 * **run** actually execute
 * **test** test for correctness
 
-To run a command, `devops-pipeline` runs a shellscript with the same name in the component directory. For example, `ansible/machines/run` will do this:
+To run a command, `mazzle` runs a shellscript with the same name in the component directory. For example, `ansible/machines/run` will do this:
 
 ```
 ./run <environment> <component_name>
@@ -232,7 +232,7 @@ echo "{}" > ${OUTPUT_PATH}
 
 # How to interpret the GUI and command line outputs
 
-`terraform/webserver/run` is a reference to the `terraform` provider which is the directory of terraform code.  `webserver` is the component and `run` is a command. Commands are shell scripts in the provider directory so you can extend devops-pipeline with your own commands.
+`terraform/webserver/run` is a reference to the `terraform` provider which is the directory of terraform code.  `webserver` is the component and `run` is a command. Commands are shell scripts in the provider directory so you can extend mazzle with your own commands.
 
 The word after the tool name is the component name.
 
@@ -242,7 +242,7 @@ You can provision your workers at the beginning of your pipeline by prefixing lo
 
 To re-build everything in an environment, we run the following open localhost:5000 and click Environments an click Run Pipeline.
 ```
-devops-pipeline environment --gui
+mazzle environment --gui
 ```
 
 # Todo
