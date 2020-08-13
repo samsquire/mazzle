@@ -1,3 +1,6 @@
 [submodule "devops_pipeline/web"]
 	path = devops_pipeline/web
 	url = git@github.com:samsquire/devops-pipeline-gui.git
+[submodule "mazzle/web"]
+	path = mazzle/web
+	url = git@github.com:samsquire/devops-pipeline-gui.git
