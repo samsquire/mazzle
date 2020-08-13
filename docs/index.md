@@ -234,6 +234,7 @@ Each time `devops-pipeline` runs a pipeline, it passes outputs of all upstream v
 
 The `builds` directory is where logs and other outputs go:
 
+* **logs** Build logs
 * **outputs** output files that are aggregated
 * **work** workspaces for builds, it's where the packaged repositories are unpacked
 * **last_runs** a file to mark a run which is used to detect changes since the last run
@@ -241,7 +242,7 @@ The `builds` directory is where logs and other outputs go:
 * **exits** exit codes for each build
 * **environments** environment files in json for each build
 * **ens** environment files in bash
-* **logs** Build logs
+
 
 # depending on artifacts
 
