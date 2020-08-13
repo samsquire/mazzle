@@ -4,7 +4,7 @@ This is a prototype. YMMV
 
 devops-pipeline is a command line tool to coordinate large complicated environments that are built from multiple devops tools. devops-pipeline is kind of a task runner and its web GUI is modelled to appear like a pipelined continuous integration server.
 
-[See this project's Readme on Github](https://github.com/samsquire/devops-pipeline)
+[See this project on Github](https://github.com/samsquire/devops-pipeline)
 
 ## infrastructure as code and pipelines as code
 
