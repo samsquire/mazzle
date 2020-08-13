@@ -1,18 +1,18 @@
-# introducing devops-pipeline - a pipelines as code tool
+# introducing mazzle - a pipelines as code tool
 
 This is a prototype. YMMV
 
-devops-pipeline is a command line tool to coordinate large complicated environments that are built from multiple devops tools. devops-pipeline is kind of a task runner and its web GUI is modelled to appear like a pipelined continuous integration server.
+mazzle is a command line tool to coordinate large complicated environments that are built from multiple devops tools. mazzle is kind of a task runner and its web GUI is modelled to appear like a pipelined continuous integration server.
 
-[See this project on Github](https://github.com/samsquire/devops-pipeline)
+[See this project on Github](https://github.com/samsquire/mazzle)
 
 ## infrastructure as code and pipelines as code
 
-Write self-descriptive pipelines in dot syntax renderable by graphviz and executable by this tool. devops-pipeline uses [Graphviz dot file syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) for its configuration. In devops-pipeline, you **specify the order and dependencies of pipeline execution via flow of data between components**. Data passes between components via environment variables.
+Write self-descriptive pipelines in dot syntax renderable by graphviz and executable by this tool. mazzle uses [Graphviz dot file syntax](https://en.wikipedia.org/wiki/DOT_(graph_description_language)) for its configuration. In mazzle, you **specify the order and dependencies of pipeline execution via flow of data between components**. Data passes between components via environment variables.
 
 # parallel build execution
 
-`devops-pipeline` knows what parts of your environment infrastructure can run together concurrently and in parallel due to its configuration being a graph file. Here is an example graph and GUI screenshot.
+`mazzle` knows what parts of your environment infrastructure can run together concurrently and in parallel due to its configuration being a graph file. Here is an example graph and GUI screenshot.
 
 [![architecture](architecture.tb.png)](https://github.com/samsquire/devops-pipeline/blob/master/docs/architecture.tb.png)
 
