@@ -3,7 +3,7 @@
 install_dir=$(pwd)
 
 echo """
-export PATH=\${PATH}:${install_dir}/devops_pipeline
-""" | sudo tee /etc/profile.d/devops-pipeline.sh
-
+export MAZZLE_HOME=${install_dir}/mazzle
+export PATH=\${PATH}:${install_dir}/mazzle
+""" | sudo tee /etc/profile.d/mazzle.sh
 

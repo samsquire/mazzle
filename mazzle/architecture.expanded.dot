@@ -1,0 +1,27 @@
+digraph "G" {
+label="pipeline";
+rankdir=TB;
+"ansible-local/dev/package";
+"ansible-local/dev/validate";
+"ansible-local/dev/plan";
+"ansible-local/dev/run";
+"ansible-local/dev/test";
+"ansible-local/dev/publish";
+"ansible-inventory/tools/package";
+"ansible-inventory/tools/validate";
+"ansible-inventory/tools/plan";
+"ansible-inventory/tools/run";
+"ansible-inventory/tools/test";
+"ansible-inventory/tools/publish";
+"ansible-local/dev/package" -> "ansible-local/dev/validate"  [key=0];
+"ansible-local/dev/validate" -> "ansible-local/dev/plan"  [key=0];
+"ansible-local/dev/plan" -> "ansible-local/dev/run"  [key=0];
+"ansible-local/dev/run" -> "ansible-local/dev/test"  [key=0];
+"ansible-local/dev/test" -> "ansible-local/dev/publish"  [key=0];
+"ansible-local/dev/publish" -> "ansible-inventory/tools/package"  [key=0];
+"ansible-inventory/tools/package" -> "ansible-inventory/tools/validate"  [key=0];
+"ansible-inventory/tools/validate" -> "ansible-inventory/tools/plan"  [key=0];
+"ansible-inventory/tools/plan" -> "ansible-inventory/tools/run"  [key=0];
+"ansible-inventory/tools/run" -> "ansible-inventory/tools/test"  [key=0];
+"ansible-inventory/tools/test" -> "ansible-inventory/tools/publish"  [key=0];
+}

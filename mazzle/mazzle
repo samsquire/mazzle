@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+args=$@
+
+pwd=$(pwd)
+cd ${MAZZLE_HOME}
+MAZZLE_ARGS="--change-directory ${pwd} ${args}" $(which gunicorn) -w 1 -k gevent  "mazzle:app" --bind 127.0.0.1:5000
