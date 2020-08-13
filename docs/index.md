@@ -72,25 +72,12 @@ packer/
 chef/
 ```
 
-Devops-pipeline will cd to these directories and run a lifecycle command, which could be one of the following:
+Devops-pipeline will cd to these directories and run a lifecycle command, which could be any of the following items in bold:
 
-* ansible/validate -> ansible/run -> ansible/test
-* shellscript/validate -> shellscript/run -> shellscript/test
-* terraform/validate -> terraform/run -> terraform/test
+* ansible/**validate** -> ansible/**run** -> ansible/**test**
+* shellscript/**validate** -> shellscript/**run** -> shellscript/**test**
+* terraform/**validate** -> terraform/**run** -> terraform/**test**
 
-# SSH workers
-
-You don't always want to run builds on the master node (where you run devops-pipeline from) You can specify a list of hosts to run builds on remote servers **via SSH**.
-
-```
-devops-pipeline --file architecture.dot \
-    --gui \
-    --workers node1 node2 \
-    --workers-key ~/.ssh/worker-ssh-key \
-    --workers-user ubuntu
-```
-
-If you're provisioning worker nodes as part of  your pipeline, which is what we recommend, you can output the machine hostnames as an output and use `--discover-workers-from-output output-name`.
 
 ## idiom - provision SSH workers at the beginning of your pipeline
 
@@ -213,6 +200,20 @@ devops-pipeline home \
 Go to http://localhost:5000.
 Click switch to environment under home.
 
+# SSH workers
+
+You don't always want to run builds on the master node (where you run devops-pipeline from) You can specify a list of hosts to run builds on remote servers **via SSH**.
+
+```
+devops-pipeline --file architecture.dot \
+    --gui \
+    --workers node1 node2 \
+    --workers-key ~/.ssh/worker-ssh-key \
+    --workers-user ubuntu
+```
+
+If you're provisioning worker nodes as part of  your pipeline, which is what we recommend, you can output the machine hostnames as an output and use `--discover-workers-from-output output-name`.
+
 
 # passing data along a pipeline
 
@@ -222,7 +223,7 @@ Each life cycle command shell script is called with the environment variables:
  * `EXIT_CODE_PATH`
  * `ARTIFACT_PATH`
 
-The `OUTPUT_PATH` is an absolute path to a file that you should write outputs as a JSON file. The EXIT_CODE_PATH is where you should write an exit code of the lifecycle command. If it is 0 then the build is considered to be successful.
+Youre lifecycle script must take this environment variables and write to files at their locations. The `OUTPUT_PATH` is an absolute path to a file that you should write outputs as a JSON file. The EXIT_CODE_PATH is where you should write an exit code of the lifecycle command. If it is 0 then the build is considered to be successful.
 
 ARTIFACT_PATH is a path that you should save an archive of parts of your working directory to be `require`d from another pipeline.
 
