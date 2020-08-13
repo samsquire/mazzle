@@ -1224,6 +1224,7 @@ def main():
 
               env["USER"] = getpass.getuser()
               pprint(env)
+              print(os.path.join(work_dir, provider))
               runner = Popen([command,
                  environment,
                  component], cwd=os.path.join(work_dir, provider), stdin=sys.stdin, stdout=log_file, stderr=log_file,
@@ -1248,7 +1249,7 @@ def main():
                 lock.acquire()
                 write_builds_file(builds_filename, build_data)
                 lock.release()
-                remove_from_running(dependency)
+                remove_from_running(dependency, environment)
                 return
 
               last_running_build = Component(dependency, environment, provider, component, command, args).calculate_state()
