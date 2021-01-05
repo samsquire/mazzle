@@ -26,6 +26,8 @@ This tool executes a [dot syntax graph](https://en.wikipedia.org/wiki/DOT_(graph
 
 ![ui screenshot](docs/architecture.png)
 
+This diagram is executed.
+
 # traditional build ui for your software development lifecycle
 
 It has a prototype web GUI to show status of builds of your infrastructure like a traditional build server.
