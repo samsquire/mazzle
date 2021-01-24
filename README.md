@@ -134,7 +134,7 @@ mazzle is a command line tool with a GUI to coordinate bringing up environments 
 
 # Installation
 
-See [mazzle.com](http://mazzle.com)
+See [devops-pipeline.com](http://devops-pipeline.com)
 
 # Worker support
 
@@ -240,12 +240,6 @@ The word after the tool name is the component name.
 
 You can provision your workers at the beginning of your pipeline by prefixing local components preceeded with an `@` (at symbol)
 
-# Usage
-
-To re-build everything in an environment, we run the following open localhost:5000 and click Environments an click Run Pipeline.
-```
-mazzle environment --gui
-```
 
 # Todo
 
