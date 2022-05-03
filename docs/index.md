@@ -223,7 +223,7 @@ Each life cycle command shell script is called with the environment variables:
  * `EXIT_CODE_PATH`
  * `ARTIFACT_PATH`
 
-Youre lifecycle script must take this environment variables and write to files at their locations. The `OUTPUT_PATH` is an absolute path to a file that you should write outputs as a JSON file. The EXIT_CODE_PATH is where you should write an exit code of the lifecycle command. If it is 0 then the build is considered to be successful.
+Your lifecycle script must take this environment variables and write to files at their locations. The `OUTPUT_PATH` is an absolute path to a file that you should write outputs as a JSON file. The EXIT_CODE_PATH is where you should write an exit code of the lifecycle command. If it is 0 then the build is considered to be successful.
 
 ARTIFACT_PATH is a path that you should save an archive of parts of your working directory to be `require`d from another pipeline.
 
